@@ -147,7 +147,8 @@ fn exec(pcre_res: @pcre_res,
         pcre::pcre_exec(**pcre_res, ptr::null(),
                         s as *c_char, str::byte_len(subject) as c_int,
                         offset as c_int, options as c_int,
-                        vec::to_ptr(ovec) as *c_int, count * (3 as c_int)) as int
+                        vec::to_ptr(ovec) as *c_int,
+                        count * (3 as c_int)) as int
     };
 
     if ret_code < 0 { ret err(ret_code as match_err); }
@@ -160,7 +161,9 @@ fn exec(pcre_res: @pcre_res,
     } else {
         vec::map(ovec) {|i| i as uint }
     };
-    let captures = vec::map(captures) {|o| char_offset_from_byte_offset(subject, o) };
+    let captures = vec::map(captures) {|o|
+        char_offset_from_byte_offset(subject, o)
+    };
 
     ret ok({subject: subject, _pcre_res: pcre_res, _captures: captures});
 }
@@ -266,7 +269,8 @@ impl of pattern_like for compile_result {
     fn compile() -> compile_result { self }
 }
 
-fn match_from<T: pattern_like>(pattern: T, subject: str, offset: uint, options: int) -> match_result {
+fn match_from<T: pattern_like>(pattern: T, subject: str,
+                               offset: uint, options: int) -> match_result {
     let c = pattern.compile();
     alt c {
       ok(p) {
@@ -291,7 +295,8 @@ fn match_from<T: pattern_like>(pattern: T, subject: str, offset: uint, options: 
     }
 }
 
-fn match<T: pattern_like>(pattern: T, subject: str, options: int) -> match_result {
+fn match<T: pattern_like>(pattern: T, subject: str,
+                          options: int) -> match_result {
     ret match_from(pattern, subject, 0u, options);
 }
 
@@ -319,19 +324,27 @@ fn substrs(m: match) -> [str] {
     ret m.groups();
 }
 
-fn replace<T: pattern_like>(pattern: T, subject: str, repl: str, options: int) -> result::t<str, either_err> {
+fn replace<T: pattern_like>(pattern: T, subject: str, repl: str,
+                            options: int) -> result::t<str, either_err> {
     ret replace_fn_from(pattern, subject, {|_m| repl }, 0u, options);
 }
 
-fn replace_from<T: pattern_like>(pattern: T, subject: str, repl: str, offset: uint, options: int) -> result::t<str, either_err> {
+fn replace_from<T: pattern_like>(pattern: T, subject: str, repl: str,
+                                 offset: uint, options: int)
+                                 -> result::t<str, either_err> {
     ret replace_fn_from(pattern, subject, {|_m| repl }, offset, options);
 }
 
-fn replace_fn<T: pattern_like>(pattern: T, subject: str, repl_fn: fn(match) -> str, options: int) -> result::t<str, either_err> {
+fn replace_fn<T: pattern_like>(pattern: T, subject: str,
+                               repl_fn: fn(match) -> str, options: int)
+                               -> result::t<str, either_err> {
     ret replace_fn_from(pattern, subject, repl_fn, 0u, options);
 }
 
-fn replace_fn_from<T: pattern_like>(pattern: T, subject: str, repl_fn: fn(match) -> str, offset: uint, options: int) -> result::t<str, either_err> {
+fn replace_fn_from<T: pattern_like>(pattern: T, subject: str,
+                                    repl_fn: fn(match) -> str, offset: uint,
+                                    options: int)
+                                    -> result::t<str, either_err> {
     let r = match_from(pattern, subject, offset, options);
     alt r {
       ok(m) {
@@ -408,7 +421,9 @@ mod test {
     fn test_substrs() {
         let p = match("(foo)bar(baz)", "foobarbaz", 0);
         alt p {
-          ok(m) { assert vec::all2(substrs(m), ["foo", "baz"]) {|s, t| s == t }; }
+          ok(m) {
+            assert vec::all2(substrs(m), ["foo", "baz"]) {|s, t| s == t };
+          }
           _ { fail; }
         }
     }
