@@ -134,7 +134,7 @@ fn exec(pcre_res: @pcre_res,
         subject: str, offset: uint,
         options: int, count_FIXME: int) -> exec_result unsafe {
     // FIXME: Weirdly pcre_fullinfo() doesn't work inside exec().
-    //        It yields 0, which means success, but the 4th arg doesn't updated.
+    //        It yields 0, which means success, but the 4th arg isn't updated.
     //let count = 0 as c_int;
     //pcre::pcre_fullinfo(**pcre_res, ptr::null(),
     //                    2 as c_int /* PCRE_INFO_CAPTURECOUNT */,
@@ -158,14 +158,13 @@ fn exec(pcre_res: @pcre_res,
     // cut off the working space
     vec::unsafe::set_len(ovec, count as uint * 2u);
 
-    let captures = if sys::size_of::<c_int>() == sys::size_of::<uint>() {
-        unsafe::reinterpret_cast::<[c_int], [uint]>(ovec)
-    } else {
-        vec::map(ovec) {|i| i as uint }
-    };
-    let captures = vec::map(captures) {|o|
-        char_offset_from_byte_offset(subject, o)
-    };
+    let captures: [uint] = [];
+    vec::reserve(captures, vec::len(ovec));
+    for o in ovec {
+        if o as int < 0 { cont; }
+        vec::push(captures, char_offset_from_byte_offset(subject, o as uint));
+    }
+    assert vec::len(captures) % 2u == 0u;
 
     ret ok({subject: subject, _pcre_res: pcre_res, _captures: captures});
 }
@@ -522,4 +521,3 @@ mod test_match_like {
         }
     }
 }
-
