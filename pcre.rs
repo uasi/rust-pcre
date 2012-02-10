@@ -85,6 +85,8 @@ type compile_err = {
     offset: uint,
 };
 
+type either_err = either::t<compile_err, match_err>;
+
 #[nolink]
 #[abi = "cdecl"]
 native mod c {
@@ -173,11 +175,13 @@ type match = {
 };
 
 iface match_like {
-    fn noop();
+    fn matched() -> str;
 }
 
 impl of match_like for match {
-    fn noop() {}
+    fn matched() -> str {
+        ret str::slice(self.subject, self._captures[0], self._captures[1]);
+    }
 }
 
 iface pattern_like {
@@ -248,13 +252,48 @@ fn byte_offset_from_char_offset(s: str, char_offset: uint) -> uint {
 fn substrs(m: match) -> [str] {
     let v: [str] = [];
     let len = vec::len(m._captures);
-    let i = 2u; // skip the first capture since it contains the whole subject
+    let i = 2u; // skip the first capture since it contains the whole match
     while i < len {
         vec::push(v, str::slice(m.subject, m._captures[i], m._captures[i+1u]));
         i += 2u;
     }
     ret v;
 }
+
+fn replace<T: pattern_like>(pattern: T, subject: str, repl: str, options: int) -> result::t<str, either_err> {
+    ret replace_fn_from(pattern, subject, {|_m| repl }, 0u, options);
+}
+
+fn replace_from<T: pattern_like>(pattern: T, subject: str, repl: str, offset: uint, options: int) -> result::t<str, either_err> {
+    ret replace_fn_from(pattern, subject, {|_m| repl }, offset, options);
+}
+
+fn replace_fn<T: pattern_like>(pattern: T, subject: str, repl_fn: fn(match) -> str, options: int) -> result::t<str, either_err> {
+    ret replace_fn_from(pattern, subject, repl_fn, 0u, options);
+}
+
+fn replace_fn_from<T: pattern_like>(pattern: T, subject: str, repl_fn: fn(match) -> str, offset: uint, options: int) -> result::t<str, either_err> {
+    let r = match_from(pattern, subject, offset, options);
+    alt r {
+      ok(m) {
+        ret ok(str::slice(subject, 0u, m._captures[0]) +
+               repl_fn(m) +
+               str::slice(subject, m._captures[1], str::char_len(subject)));
+      }
+      err(e) { ret err(e); }
+    }
+}
+
+//fn replace_all<T: pattern_like>(pattern: T, subject: str, repl: str,
+//                                options: int) -> result::t<str, either_err> {
+//    fail;
+//}
+//
+//fn replace_all_<T: pattern_like>(pattern: T, subject: str,
+//                                 repl_fn: fn(match) -> str, options: int)
+//                                 -> result::t<str, either_err> {
+//    fail;
+//}
 
 pure fn is_nomatch(mr: match_result) -> bool {
     ret alt mr {
@@ -316,5 +355,42 @@ mod test {
           _ { fail; }
         }
     }
-}
 
+    #[test]
+    fn test_replace() {
+        let r = replace("bcd", "AbcdE", "BCD", 0);
+        alt r {
+          ok(s) { assert s == "ABCDE"; }
+          _ { fail; }
+        }
+    }
+
+    #[test]
+    fn test_replace_from() {
+        let r = replace_from("bcd", "AbcdbcdE", "BCD", 2u, 0);
+        alt r {
+          ok(s) { assert s == "AbcdBCDE"; }
+          _ { fail; }
+        }
+    }
+
+    #[test]
+    fn test_replace_fn() {
+        let r = replace_fn("bcd", "AbcdE",
+                           {|m| str::to_upper(m.matched()) }, 0);
+        alt r {
+          ok(s) { assert s == "ABCDE"; }
+          _ { fail; }
+        }
+    }
+
+    #[test]
+    fn test_replace_fn_from() {
+        let r = replace_fn_from("bcd", "AbcdbcdE",
+                                {|m| str::to_upper(m.matched()) }, 2u, 0);
+        alt r {
+          ok(s) { assert s == "AbcdBCDE"; }
+          _ { fail; }
+        }
+    }
+}
