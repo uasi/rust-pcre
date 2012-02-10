@@ -4,6 +4,8 @@ import core::ctypes::*;
 import core::either::{left, right};
 import core::option::{some, none};
 import core::result::{ok, err};
+import either = core::either::t;
+import result = core::result::t;
 
 const PCRE_CASELESS: int          = 0x00000001; // Compile
 const PCRE_MULTILINE: int         = 0x00000002; // Compile
@@ -51,21 +53,21 @@ Type: exec_result
 
 The result type of <exec>.
 */
-type exec_result = result::t<match, match_err>;
+type exec_result = result<match, match_err>;
 
 /*
 Type: match_result
 
 The result type of <match>.
 */
-type match_result = result::t<match, either::t<compile_err, match_err>>;
+type match_result = result<match, either<compile_err, match_err>>;
 
 /*
 Type: compile_result
 
 The result type of <compile>.
 */
-type compile_result = result::t<@pcre_res, compile_err>;
+type compile_result = result<@pcre_res, compile_err>;
 
 /*
 Type: match_err
@@ -85,7 +87,7 @@ type compile_err = {
     offset: uint,
 };
 
-type either_err = either::t<compile_err, match_err>;
+type either_err = either<compile_err, match_err>;
 
 #[nolink]
 #[abi = "cdecl"]
@@ -325,26 +327,26 @@ fn substrs(m: match) -> [str] {
 }
 
 fn replace<T: pattern_like>(pattern: T, subject: str, repl: str,
-                            options: int) -> result::t<str, either_err> {
+                            options: int) -> result<str, either_err> {
     ret replace_fn_from(pattern, subject, {|_m| repl }, 0u, options);
 }
 
 fn replace_from<T: pattern_like>(pattern: T, subject: str, repl: str,
                                  offset: uint, options: int)
-                                 -> result::t<str, either_err> {
+                                 -> result<str, either_err> {
     ret replace_fn_from(pattern, subject, {|_m| repl }, offset, options);
 }
 
 fn replace_fn<T: pattern_like>(pattern: T, subject: str,
                                repl_fn: fn(match) -> str, options: int)
-                               -> result::t<str, either_err> {
+                               -> result<str, either_err> {
     ret replace_fn_from(pattern, subject, repl_fn, 0u, options);
 }
 
 fn replace_fn_from<T: pattern_like>(pattern: T, subject: str,
                                     repl_fn: fn(match) -> str, offset: uint,
                                     options: int)
-                                    -> result::t<str, either_err> {
+                                    -> result<str, either_err> {
     let r = match_from(pattern, subject, offset, options);
     alt r {
       ok(m) {
@@ -355,13 +357,13 @@ fn replace_fn_from<T: pattern_like>(pattern: T, subject: str,
 }
 
 //fn replace_all<T: pattern_like>(pattern: T, subject: str, repl: str,
-//                                options: int) -> result::t<str, either_err> {
+//                                options: int) -> result<str, either_err> {
 //    fail;
 //}
 //
 //fn replace_all_<T: pattern_like>(pattern: T, subject: str,
 //                                 repl_fn: fn(match) -> str, options: int)
-//                                 -> result::t<str, either_err> {
+//                                 -> result<str, either_err> {
 //    fail;
 //}
 
