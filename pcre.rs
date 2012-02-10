@@ -135,7 +135,7 @@ fn exec(pcre_res: @pcre_res,
     //pcre::pcre_fullinfo(**pcre_res, ptr::null(),
     //                    2 as c_int /* PCRE_INFO_CAPTURECOUNT */,
     //                    ptr::addr_of(count));
-    let count = count_FIXME + 1 as c_int;
+    let count = (count_FIXME + 1) as c_int;
 
     let offset = byte_offset_from_char_offset(subject, offset);
     let options = options | PCRE_NO_UTF8_CHECK; // str is always valid
