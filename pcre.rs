@@ -138,6 +138,7 @@ fn exec(pcre_res: @pcre_res,
     let count = count_FIXME + 1 as c_int;
 
     let offset = byte_offset_from_char_offset(subject, offset);
+    let options = options | PCRE_NO_UTF8_CHECK; // str is always valid
 
     let ovec = vec::init_elt((count as uint) * 3u, 0u as c_int);
     let ret_code = str::as_buf(subject) {|s|
