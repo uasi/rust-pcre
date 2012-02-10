@@ -321,11 +321,6 @@ fn byte_offset_from_char_offset(s: str, char_offset: uint) -> uint {
     ret vec::len(v);
 }
 
-// FIXME: better name?
-fn substrs(m: match) -> [str] {
-    ret m.groups();
-}
-
 fn replace<T: pattern_like>(pattern: T, subject: str, repl: str,
                             options: int) -> result<str, either_err> {
     ret replace_fn_from(pattern, subject, {|_m| repl }, 0u, options);
@@ -417,17 +412,6 @@ mod test {
 
         let p = match("(foo)bar", "baz", 0);
         assert is_nomatch(p);
-    }
-
-    #[test]
-    fn test_substrs() {
-        let p = match("(foo)bar(baz)", "foobarbaz", 0);
-        alt p {
-          ok(m) {
-            assert vec::all2(substrs(m), ["foo", "baz"]) {|s, t| s == t };
-          }
-          _ { fail; }
-        }
     }
 
     #[test]
