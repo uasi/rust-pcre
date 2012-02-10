@@ -176,11 +176,77 @@ type match = {
 
 iface match_like {
     fn matched() -> str;
+    fn prematch() -> str;
+    fn postmatch() -> str;
+    fn begin() -> uint;
+    fn end() -> uint;
+
+    fn group(uint) -> option<str>;
+    fn named_group(str) -> option<str>;
+    fn groups() -> [str];
+    fn groups_iter(fn(str));
+    fn group_count() -> uint;
+    fn group_names() -> [str];
 }
 
 impl of match_like for match {
     fn matched() -> str {
-        ret str::slice(self.subject, self._captures[0], self._captures[1]);
+        ret str::slice(self.subject, self.begin(), self.end());
+    }
+
+    fn prematch() -> str {
+        ret str::slice(self.subject, 0u, self.begin());
+    }
+
+    fn postmatch() -> str {
+        ret str::slice(self.subject ,self.end(),
+                       str::char_len(self.subject));
+    }
+
+    fn begin() -> uint {
+        ret self._captures[0];
+    }
+
+    fn end() -> uint {
+        ret self._captures[1];
+    }
+
+    fn group(idx: uint) -> option<str> {
+        if idx >= self.group_count() {
+            ret none;
+        }
+        ret some(str::slice(self.subject,
+                            self._captures[(idx + 1u) * 2u],
+                            self._captures[(idx + 1u) * 2u + 1u]));
+    }
+
+    fn named_group(name: str) -> option<str> {
+        (name);
+        fail;
+    }
+
+    fn groups() -> [str] {
+        let v = [];
+        vec::reserve(v, self.group_count());
+        self.groups_iter {|elt| vec::push(v, elt); }
+        ret v;
+    }
+
+    fn groups_iter(blk: fn(str)) {
+        uint::range(0u, self.group_count()) {|i|
+            alt self.group(i) {
+              some(s) { blk(s); }
+              none { fail; }
+            }
+        }
+    }
+
+    fn group_count() -> uint {
+        ret vec::len(self._captures) / 2u - 1u;
+    }
+
+    fn group_names() -> [str] {
+        fail;
     }
 }
 
@@ -250,14 +316,7 @@ fn byte_offset_from_char_offset(s: str, char_offset: uint) -> uint {
 
 // FIXME: better name?
 fn substrs(m: match) -> [str] {
-    let v: [str] = [];
-    let len = vec::len(m._captures);
-    let i = 2u; // skip the first capture since it contains the whole match
-    while i < len {
-        vec::push(v, str::slice(m.subject, m._captures[i], m._captures[i+1u]));
-        i += 2u;
-    }
-    ret v;
+    ret m.groups();
 }
 
 fn replace<T: pattern_like>(pattern: T, subject: str, repl: str, options: int) -> result::t<str, either_err> {
@@ -276,9 +335,7 @@ fn replace_fn_from<T: pattern_like>(pattern: T, subject: str, repl_fn: fn(match)
     let r = match_from(pattern, subject, offset, options);
     alt r {
       ok(m) {
-        ret ok(str::slice(subject, 0u, m._captures[0]) +
-               repl_fn(m) +
-               str::slice(subject, m._captures[1], str::char_len(subject)));
+        ret ok(m.prematch() + repl_fn(m) + m.postmatch());
       }
       err(e) { ret err(e); }
     }
