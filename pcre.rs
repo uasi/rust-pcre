@@ -452,3 +452,74 @@ mod test {
         }
     }
 }
+
+#[test]
+mod test_match_like {
+    #[test]
+    fn test_group() {
+        let r = match("(foo)bar(baz)", "foobarbaz", 0);
+        alt r {
+          ok(m) {
+            alt m.group(0u) { some(s) { assert s == "foo"; } _ { fail; } }
+            alt m.group(1u) { some(s) { assert s == "baz"; } _ { fail; } }
+            alt m.group(2u) { none { assert true; } _ { fail; } }
+          }
+          _ { fail; }
+        }
+    }
+
+    #[test]
+    fn test_groups() {
+        let r = match("(foo)bar(baz)", "foobarbaz", 0);
+        alt r {
+          ok(m) {
+            assert vec::all2(m.groups(), ["foo", "baz"]) {|s, t| s == t };
+          }
+          _ { fail; }
+        }
+    }
+
+    #[test]
+    fn test_group_count() {
+        let r = match("foobarbaz", "foobarbaz", 0);
+        alt r {
+          ok(m) {
+            assert m.group_count() == 0u;
+          }
+          _ { fail; }
+        }
+
+        let r = match("(foo)bar(baz)", "foobarbaz", 0);
+        alt r {
+          ok(m) {
+            assert m.group_count() == 2u;
+          }
+          _ { fail; }
+        }
+
+        let r = match("(?:foo)bar", "foobar", 0);
+        alt r {
+          ok(m) {
+            assert m.group_count() == 0u;
+          }
+          _ { fail; }
+        }
+
+        let r = match("(?:(foo)|baz)bar", "foobar", 0);
+        alt r {
+          ok(m) {
+            assert m.group_count() == 1u;
+          }
+          _ { fail; }
+        }
+
+        let r = match("(?:foo|(baz))bar", "foobar", 0);
+        alt r {
+          ok(m) {
+            assert m.group_count() == 0u;
+          }
+          _ { fail; }
+        }
+    }
+}
+
