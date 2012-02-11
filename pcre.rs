@@ -48,6 +48,11 @@ resource pcre_res(p: *pcre) {
     c::free(p as *void);
 }
 
+type pattern = {
+    str: str,
+    _pcre_res: @pcre_res,
+};
+
 /*
 Type: exec_result
 
@@ -67,7 +72,7 @@ Type: compile_result
 
 The result type of <compile>.
 */
-type compile_result = result<@pcre_res, compile_err>;
+type compile_result = result<pattern, compile_err>;
 
 /*
 Type: match_err
@@ -127,16 +132,16 @@ fn compile(pattern: str, options: int) -> compile_result unsafe {
                  reason: str::from_cstr(errreason as *u8),
                  offset: offset});
     }
-    ret ok(@pcre_res(p));
+    ret ok({str: pattern, _pcre_res: @pcre_res(p)});
 }
 
-fn exec(pcre_res: @pcre_res,
+fn exec(pattern: pattern,
         subject: str, offset: uint,
         options: int, count_FIXME: int) -> exec_result unsafe {
     // FIXME: Weirdly pcre_fullinfo() doesn't work inside exec().
     //        It yields 0, which means success, but the 4th arg isn't updated.
     //let count = 0 as c_int;
-    //pcre::pcre_fullinfo(**pcre_res, ptr::null(),
+    //pcre::pcre_fullinfo(**(pattern._pcre_res), ptr::null(),
     //                    2 as c_int /* PCRE_INFO_CAPTURECOUNT */,
     //                    ptr::addr_of(count));
     let count = (count_FIXME + 1) as c_int;
@@ -146,7 +151,7 @@ fn exec(pcre_res: @pcre_res,
 
     let ovec = vec::init_elt((count as uint) * 3u, 0u as c_int);
     let ret_code = str::as_buf(subject) {|s|
-        pcre::pcre_exec(**pcre_res, ptr::null(),
+        pcre::pcre_exec(**(pattern._pcre_res), ptr::null(),
                         s as *c_char, str::byte_len(subject) as c_int,
                         offset as c_int, options as c_int,
                         vec::to_ptr(ovec) as *c_int,
@@ -166,12 +171,12 @@ fn exec(pcre_res: @pcre_res,
     }
     assert vec::len(captures) % 2u == 0u;
 
-    ret ok({subject: subject, _pcre_res: pcre_res, _captures: captures});
+    ret ok({subject: subject, pattern: pattern, _captures: captures});
 }
 
 type match = {
     subject: str,
-    _pcre_res: @pcre_res,
+    pattern: pattern,
     _captures: [uint],
     // FIXME: we may cache these values for reuse
     // mutable _substrs: option<[str]>,
@@ -182,7 +187,7 @@ type match = {
 impl match_info_util for match {
     fn info_name_count() -> uint {
         let count = -1 as c_int;
-        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
+        pcre::pcre_fullinfo(**(self.pattern._pcre_res), ptr::null(),
                             8 as c_int /* PCRE_INFO_NAMECOUNT */,
                             ptr::addr_of(count) as *void);
         assert count >= 0 as c_int;
@@ -191,7 +196,7 @@ impl match_info_util for match {
 
     fn info_name_entry_size() -> uint {
         let size = -1 as c_int;
-        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
+        pcre::pcre_fullinfo(**(self.pattern._pcre_res), ptr::null(),
                             7 as c_int /* PCRE_INFO_NAMEENTRYSIZE */,
                             ptr::addr_of(size) as *void);
         assert size >= 0 as c_int;
@@ -202,7 +207,7 @@ impl match_info_util for match {
     //unsafe fn info_name_table() -> *u8 { ptr::null() }
     fn with_name_table(blk: fn(*u8)) unsafe {
         let table = ptr::null::<u8>();
-        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
+        pcre::pcre_fullinfo(**(self.pattern._pcre_res), ptr::null(),
                             9 as c_int /* PCRE_INFO_NAMETABLE */,
                             ptr::addr_of(table) as *void);
         blk(table);
@@ -304,7 +309,7 @@ impl of pattern_like for str {
     fn compile() -> compile_result { compile(self, 0) }
 }
 
-impl of pattern_like for @pcre_res {
+impl of pattern_like for pattern {
     fn compile() -> compile_result { ok(self) }
 }
 
@@ -319,7 +324,7 @@ fn match_from<T: pattern_like>(pattern: T, subject: str,
       ok(p) {
         // FIXME: see exec()
         let count_FIXME = 0 as c_int;
-        pcre::pcre_fullinfo(**p, ptr::null(),
+        pcre::pcre_fullinfo(**(p._pcre_res), ptr::null(),
                             2 as c_int /* PCRE_INFO_CAPTURECOUNT */,
                             ptr::addr_of(count_FIXME) as *void);
         let e = exec(p, subject, offset, options, count_FIXME as int);
