@@ -314,6 +314,7 @@ impl of pattern_like for compile_result {
 
 fn match_from<T: pattern_like>(pattern: T, subject: str,
                                offset: uint, options: int) -> match_result {
+    assert offset <= str::char_len(subject);
     let c = pattern.compile();
     alt c {
       ok(p) {
