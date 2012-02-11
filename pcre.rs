@@ -1,5 +1,34 @@
 use std;
 
+// type
+export compile_result;
+export exec_result;
+export match_result;
+export replace_result;
+export compile_err;
+export match_err;
+export pattern;
+export match;
+
+// enum
+export either_err;
+
+// fn
+export compile;
+export exec;
+export match;
+export match_from;
+export replace;
+export replace_from;
+export replace_fn;
+export replace_fn_from;
+export replace_all;
+export replace_all_from;
+export replace_all_fn;
+export replace_all_fn_from;
+export fmt_compile_err;
+export is_nomatch;
+
 import core::ctypes::*;
 import core::option::{some, none};
 import core::result::{ok, err};
