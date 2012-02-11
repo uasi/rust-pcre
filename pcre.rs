@@ -183,11 +183,19 @@ type match = {
     // mutable _names: option<std::map<str, uint>>,
 };
 
-// FIXME: should be pcre_res_util
-impl match_info_util for match {
+impl pattern_util for pattern {
+    fn info_capture_count() -> uint {
+        let count = -1 as c_int;
+        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
+                            2 as c_int /* PCRE_INFO_CAPTURECOUNT */,
+                            ptr::addr_of(count) as *void);
+        assert count >= 0 as c_int;
+        ret count as uint;
+    }
+
     fn info_name_count() -> uint {
         let count = -1 as c_int;
-        pcre::pcre_fullinfo(**(self.pattern._pcre_res), ptr::null(),
+        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
                             8 as c_int /* PCRE_INFO_NAMECOUNT */,
                             ptr::addr_of(count) as *void);
         assert count >= 0 as c_int;
@@ -196,7 +204,7 @@ impl match_info_util for match {
 
     fn info_name_entry_size() -> uint {
         let size = -1 as c_int;
-        pcre::pcre_fullinfo(**(self.pattern._pcre_res), ptr::null(),
+        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
                             7 as c_int /* PCRE_INFO_NAMEENTRYSIZE */,
                             ptr::addr_of(size) as *void);
         assert size >= 0 as c_int;
@@ -207,7 +215,7 @@ impl match_info_util for match {
     //unsafe fn info_name_table() -> *u8 { ptr::null() }
     fn with_name_table(blk: fn(*u8)) unsafe {
         let table = ptr::null::<u8>();
-        pcre::pcre_fullinfo(**(self.pattern._pcre_res), ptr::null(),
+        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
                             9 as c_int /* PCRE_INFO_NAMETABLE */,
                             ptr::addr_of(table) as *void);
         blk(table);
@@ -286,11 +294,11 @@ impl of match_like for match {
     }
 
     fn group_names() -> [str] unsafe {
-        let count = self.info_name_count();
+        let count = self.pattern.info_name_count();
         if count == 0u { ret []; }
-        let size = self.info_name_entry_size();
+        let size = self.pattern.info_name_entry_size();
         let names: [str] = [];
-        self.with_name_table {|table|
+        self.pattern.with_name_table {|table|
             uint::range(0u, count) {|i|
                 let p = ptr::offset(table, size * i + 2u);
                 let s = str::from_cstr(p);
