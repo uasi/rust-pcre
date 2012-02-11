@@ -206,7 +206,7 @@ type match = {
     pattern: pattern,
     _captures: [uint],
     // FIXME: we may cache these values for reuse
-    // mutable _groups: option<[str]>,
+    // mutable _subgroups: option<[str]>,
     // mutable _names: option<std::map<str, uint>>,
 };
 
@@ -338,14 +338,14 @@ impl match_util for match {
         fail;
     }
 
-    fn groups() -> [str] {
+    fn subgroups() -> [str] {
         let v = [];
         vec::reserve(v, self.group_count());
-        self.groups_iter {|elt| vec::push(v, elt); }
+        self.subgroups_iter {|elt| vec::push(v, elt); }
         ret v;
     }
 
-    fn groups_iter(blk: fn(str)) {
+    fn subgroups_iter(blk: fn(str)) {
         uint::range(1u, self.group_count() + 1u) {|i|
             alt self.group(i) {
               some(s) { blk(s); }
@@ -712,11 +712,11 @@ mod test_match_like {
     }
 
     #[test]
-    fn test_groups() {
+    fn test_subgroups() {
         let r = match("(foo)bar(baz)", "foobarbaz", 0);
         alt r {
           ok(m) {
-            assert vec::all2(m.groups(), ["foo", "baz"]) {|s, t| s == t };
+            assert vec::all2(m.subgroups(), ["foo", "baz"]) {|s, t| s == t };
           }
           _ { fail; }
         }
