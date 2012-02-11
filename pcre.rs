@@ -236,22 +236,7 @@ impl pattern_util for pattern {
     }
 }
 
-iface match_like {
-    fn matched() -> str;
-    fn prematch() -> str;
-    fn postmatch() -> str;
-    fn begin() -> uint;
-    fn end() -> uint;
-
-    fn group(uint) -> option<str>;
-    fn named_group(str) -> option<str>;
-    fn groups() -> [str];
-    fn groups_iter(fn(str));
-    fn group_count() -> uint;
-    fn group_names() -> [str];
-}
-
-impl of match_like for match {
+impl match_util for match {
     fn matched() -> str {
         ret str::slice(self.subject, self.begin(), self.end());
     }
