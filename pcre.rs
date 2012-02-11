@@ -206,13 +206,12 @@ impl pattern_util for pattern {
         ret size as uint;
     }
 
-    // NOTE: impl cannot have an unsafe fn (a bug?)
-    //unsafe fn info_name_table() -> *u8 { ptr::null() }
     fn with_name_table(blk: fn(*u8)) unsafe {
         let table = ptr::null::<u8>();
         pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
                             9 as c_int /* PCRE_INFO_NAMETABLE */,
                             ptr::addr_of(table) as *void);
+        assert table != ptr::null::<u8>();
         blk(table);
     }
 
