@@ -579,35 +579,123 @@ pure fn is_nomatch(mr: match_result) -> bool {
 }
 
 #[cfg(test)]
+mod test_util {
+    export option_util;
+    export result_util;
+
+    impl option_util<T> for option<T> {
+        fn is_some() -> bool { option::is_some(self) }
+        fn is_none() -> bool { option::is_none(self) }
+
+        fn is_some_and(blk: fn(T) -> bool) -> bool {
+            ret alt self {
+              some(t) { blk(t) }
+              none { false }
+            };
+        }
+
+        // Who wants?
+        fn is_none_and(blk: fn() -> bool) -> bool {
+            ret alt self {
+              some(_) { false }
+              none { blk() }
+            };
+        }
+    }
+
+    impl result_util<T, U> for result<T, U> {
+        fn is_ok() -> bool { result::success(self) }
+        fn is_err() -> bool { result::failure(self) }
+
+        fn is_ok_and(blk: fn(T) -> bool) -> bool {
+            ret alt self {
+              ok(t) { blk(t) }
+              err(_) { false }
+            };
+        }
+
+        fn is_err_and(blk: fn(U) -> bool) -> bool {
+            ret alt self {
+              ok(_) { false }
+              err(u) { blk(u) }
+            };
+        }
+    }
+
+    #[test]
+    fn test_option_util() {
+        let s = some(42);
+
+        assert  s.is_some();
+        assert  s.is_some_and {|i| i == 42 };
+        assert !s.is_some_and {|i| i != 42 };
+
+        assert !s.is_none();
+        assert !s.is_none_and {|| true };
+        assert !s.is_none_and {|| false };
+
+        let n = none::<()>;
+
+        assert  n.is_none();
+        assert  n.is_none_and {|| true };
+        assert !n.is_none_and {|| false };
+
+        assert !n.is_some();
+        assert !n.is_some_and {|_nil| true };
+        assert !n.is_some_and {|_nil| false };
+
+    }
+
+    #[test]
+    fn test_result_util() {
+        let o: result<int, ()> = ok(42);
+
+        assert  o.is_ok();
+        assert  o.is_ok_and {|i| i == 42 };
+        assert !o.is_ok_and {|i| i != 42 };
+
+        assert !o.is_err();
+        assert !o.is_err_and {|_nil| true };
+        assert !o.is_err_and {|_nil| false };
+
+        let e: result<(), int> = err(42);
+
+        assert  e.is_err();
+        assert  e.is_err_and {|i| i == 42 };
+        assert !e.is_err_and {|i| i != 42 };
+
+        assert !e.is_ok();
+        assert !e.is_ok_and {|_nil| true };
+        assert !e.is_ok_and {|_nil| false };
+    }
+}
+
+#[cfg(test)]
 mod test {
-    import result::*;
+    import test_util::*;
 
     #[test]
     fn test_compile() {
-        import result::*;
+        let r = compile("foo", 0);
+        assert r.is_ok();
 
-        let p = compile("foo", 0);
-        assert success(p);
-
-        let p = compile("foo(", 0);
-        alt p {
-          err(e) {
+        let r = compile("foo(", 0);
+        assert r.is_err_and {|e|
             assert e.code == 14;
             assert e.reason == "missing )";
             assert e.offset == 4u;
-          }
-          _ { fail; }
+            ret true;
         }
     }
 
     #[test]
     fn test_match() {
         let r = match("(foo)bar", "foobar", 0);
-        assert success(r);
+        assert r.is_ok();
 
         let c = compile("(foo)bar", 0);
         let r = match(c, "foobar", 0);
-        assert success(r);
+        assert r.is_ok();
 
         let r = match("foo(", "foobar", 0);
         alt r {
@@ -627,174 +715,121 @@ mod test {
     #[test]
     fn test_match_options_0() {
         let r = match(compile("foobar", PCRE_CASELESS), "FOOBAR", 0);
-        assert success(r);
+        assert r.is_ok();
     }
 
     // match() accepts compile options
     #[test]
     fn test_match_options_1() {
         let r = match("foobar", "FOOBAR", PCRE_CASELESS);
-        assert success(r);
+        assert r.is_ok();
     }
 
-    // inline options supersedes match-time compile options
+    // Inline options supersedes match-time compile options
     #[test]
     fn test_match_options_2() {
         let r = match("(?-i)foobar", "FOOBAR", PCRE_CASELESS);
-        assert failure(r);
+        assert r.is_err();
     }
 
-    // compile-time compile options supersedes match-time compile options
+    // Compile-time compile options supersedes match-time compile options
     #[test]
     fn test_match_options_3() {
         let r = match(compile("foobar", 0), "FOOBAR", PCRE_CASELESS);
-        assert failure(r);
+        assert r.is_err();
     }
 
     #[test]
     fn test_replace() {
         let r = replace("bcd", "AbcdE", "BCD", 0);
-        alt r {
-          ok(s) { assert s == "ABCDE"; }
-          _ { fail; }
-        }
+        assert r.is_ok_and {|s| s == "ABCDE" };
     }
 
     #[test]
     fn test_replace_from() {
         let r = replace_from("bcd", "AbcdbcdE", "BCD", 2u, 0);
-        alt r {
-          ok(s) { assert s == "AbcdBCDE"; }
-          _ { fail; }
-        }
+        assert r.is_ok_and {|s| s == "AbcdBCDE" };
     }
 
     #[test]
     fn test_replace_fn() {
         let r = replace_fn("bcd", "AbcdE",
                            {|m| str::to_upper(m.matched()) }, 0);
-        alt r {
-          ok(s) { assert s == "ABCDE"; }
-          _ { fail; }
-        }
+        assert r.is_ok_and {|s| s == "ABCDE" };
     }
 
     #[test]
     fn test_replace_fn_from() {
         let r = replace_fn_from("bcd", "AbcdbcdE",
                                 {|m| str::to_upper(m.matched()) }, 2u, 0);
-        alt r {
-          ok(s) { assert s == "AbcdBCDE"; }
-          _ { fail; }
-        }
+        assert r.is_ok_and {|s| s == "AbcdBCDE" };
     }
 
     #[test]
     fn test_replace_all() {
         let r = replace_all("XX", "XXfooXXbarXXbazXX", "_", 0);
-        alt r {
-          ok(s) { assert s == "_foo_bar_baz_"; }
-          _ { fail; }
-        }
+        assert r.is_ok_and {|s| s == "_foo_bar_baz_" };
     }
 }
 
 #[cfg(test)]
-mod test_match_like {
+mod test_match_util {
+    import result::*;
+    import test_util::*;
+
     #[test]
     fn test_group() {
         let r = match("(foo)bar(baz)", "foobarbaz", 0);
-        alt r {
-          ok(m) {
-            alt m.group(0u) { some(s) { assert s == "foobarbaz"; } _ { fail; } }
-            alt m.group(1u) { some(s) { assert s == "foo"; } _ { fail; } }
-            alt m.group(2u) { some(s) { assert s == "baz"; } _ { fail; } }
-            alt m.group(3u) { none { assert true; } _ { fail; } }
-          }
-          _ { fail; }
+        assert r.is_ok_and {|m|
+            assert m.group(0u).is_some_and {|s| s == "foobarbaz" };
+            assert m.group(1u).is_some_and {|s| s == "foo" };
+            assert m.group(2u).is_some_and {|s| s == "baz" };
+            assert m.group(3u).is_none();
+            ret true;
         }
     }
 
     #[test]
     fn test_subgroups() {
         let r = match("(foo)bar(baz)", "foobarbaz", 0);
-        alt r {
-          ok(m) {
-            assert vec::all2(m.subgroups(), ["foo", "baz"]) {|s, t| s == t };
-          }
-          _ { fail; }
+        assert r.is_ok_and {|m|
+            vec::all2(m.subgroups(), ["foo", "baz"]) {|s, t| s == t }
         }
     }
 
     #[test]
     fn test_group_count() {
         let r = match("foobarbaz", "foobarbaz", 0);
-        alt r {
-          ok(m) {
-            assert m.group_count() == 0u;
-          }
-          _ { fail; }
-        }
+        assert r.is_ok_and {|m| m.group_count() == 0u };
 
         let r = match("(foo)bar(baz)", "foobarbaz", 0);
-        alt r {
-          ok(m) {
-            assert m.group_count() == 2u;
-          }
-          _ { fail; }
-        }
+        assert r.is_ok_and {|m| m.group_count() == 2u };
 
         let r = match("(?:foo)bar", "foobar", 0);
-        alt r {
-          ok(m) {
-            assert m.group_count() == 0u;
-          }
-          _ { fail; }
-        }
+        assert r.is_ok_and {|m| m.group_count() == 0u };
 
         let r = match("(?:(foo)|baz)bar", "foobar", 0);
-        alt r {
-          ok(m) {
-            assert m.group_count() == 1u;
-          }
-          _ { fail; }
-        }
+        assert r.is_ok_and {|m| m.group_count() == 1u };
 
         let r = match("(?:foo|(baz))bar", "foobar", 0);
-        alt r {
-          ok(m) {
-            assert m.group_count() == 0u;
-          }
-          _ { fail; }
-        }
+        assert r.is_ok_and {|m| m.group_count() == 0u };
     }
 
     #[test]
     fn test_group_names() {
         let r = match("(?<foo_name>foo)bar", "foobar", 0);
-        alt r {
-          ok(m) {
-            assert vec::all2(m.group_names(), ["foo_name"]) {|s, t| s == t };
-          }
-          _ { fail; }
+        assert r.is_ok_and {|m|
+            vec::all2(m.group_names(), ["foo_name"]) {|s, t| s == t }
         }
     }
 
     #[test]
     fn test_named_group() {
         let r = match("(?<foo_name>f..)bar", "foobar", 0);
-        alt r {
-          ok(m) {
-            alt m.named_group("foo_name") {
-              some(s) { assert s == "foo"; }
-              _ { fail; }
-            }
-            alt m.named_group("nonexistent") {
-              none { assert true; }
-              _ { fail; }
-            }
-          }
-          _ { fail; }
+        assert r.is_ok_and {|m|
+            assert m.named_group("foo_name").is_some_and {|s| s == "foo" };
+            assert m.named_group("nonexistent").is_none();
+            ret true;
         }
     }
 }
