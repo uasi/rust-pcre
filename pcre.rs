@@ -1,7 +1,7 @@
 use std;
 
 import core::ctypes::*;
-import core::either::{left, right};
+// import core::either::{compile_err, match_err};
 import core::option::{some, none};
 import core::result::{ok, err};
 import either = core::either::t;
@@ -190,11 +190,14 @@ The type that represents match error.
 type match_err = int;
 
 /*
-Type: either_err
+Enum: either_err
 
-The type that represents either compile or match error.
+Either compile or match error.
 */
-type either_err = either<compile_err, match_err>;
+enum either_err {
+    compile_err(compile_err),
+    match_err(match_err),
+}
 
 type pattern = {
     str: str,
@@ -445,19 +448,19 @@ fn match_from<T: pattern_like>(pattern: T, subject: str,
 
     let c = pattern.compile(c_opts);
     alt c {
-      ok(p) {
-        let e = exec(p, subject, offset, e_opts);
+      ok(pattern) {
+        let e = exec(pattern, subject, offset, e_opts);
         alt e {
           ok(match) {
             ret ok(match);
           }
-          err(match_err) {
-            ret err(right(match_err));
+          err(m_err) {
+            ret err(match_err(m_err));
           }
         }
       }
-      err(compile_err) {
-          ret err(left(compile_err));
+      err(c_err) {
+          ret err(compile_err(c_err));
       }
     }
 }
@@ -532,7 +535,7 @@ fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
             s += repl_fn(m);
             offset = m.end();
           }
-          err(right(PCRE_ERROR_NOMATCH)) {
+          err(match_err(PCRE_ERROR_NOMATCH)) {
             let rest_len = subject_len - offset;
             if rest_len > 0u {
                 s += str::slice(subject, offset, rest_len);
@@ -573,7 +576,7 @@ Returns true iff mr indicates that the subject did not match the pattern.
 */
 pure fn is_nomatch(mr: match_result) -> bool {
     ret alt mr {
-      err(right(PCRE_ERROR_NOMATCH)) { true }
+      err(match_err(PCRE_ERROR_NOMATCH)) { true }
       _ { false }
     };
 }
@@ -699,7 +702,7 @@ mod test {
 
         let r = match("foo(", "foobar", 0);
         alt r {
-          err(left(e)) {
+          err(compile_err(e)) {
             assert e.code == 14;
             assert e.reason == "missing )";
             assert e.offset == 4u;
