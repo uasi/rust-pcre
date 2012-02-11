@@ -399,6 +399,11 @@ fn replace_fn_from<T: pattern_like>(pattern: T, subject: str,
 //    fail;
 //}
 
+/*
+Function: is_nomatch
+
+Returns true iff mr indicates that the subject did not match the pattern
+*/
 pure fn is_nomatch(mr: match_result) -> bool {
     ret alt mr {
       err(right(-1)) { true }
