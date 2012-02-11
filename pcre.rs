@@ -143,10 +143,12 @@ resource pcre_res(p: *pcre) {
     c::free(p as *void);
 }
 
-type pattern = {
-    str: str,
-    _pcre_res: @pcre_res,
-};
+/*
+Type: compile_result
+
+The result type of <compile>.
+*/
+type compile_result = result<pattern, compile_err>;
 
 /*
 Type: exec_result
@@ -160,21 +162,14 @@ Type: match_result
 
 The result type of <match>.
 */
-type match_result = result<match, either<compile_err, match_err>>;
+type match_result = result<match, either_err>;
 
 /*
-Type: compile_result
+Type: replace_result
 
-The result type of <compile>.
+The result type of <replace>.
 */
-type compile_result = result<pattern, compile_err>;
-
-/*
-Type: match_err
-
-The type that represents match error.
-*/
-type match_err = int;
+type replace_result = result<str, either_err>;
 
 /*
 Type: compile_err
@@ -187,7 +182,33 @@ type compile_err = {
     offset: uint,
 };
 
+/*
+Type: match_err
+
+The type that represents match error.
+*/
+type match_err = int;
+
+/*
+Type: either_err
+
+The type that represents either compile or match error.
+*/
 type either_err = either<compile_err, match_err>;
+
+type pattern = {
+    str: str,
+    _pcre_res: @pcre_res,
+};
+
+type match = {
+    subject: str,
+    pattern: pattern,
+    _captures: [uint],
+    // FIXME: we may cache these values for reuse
+    // mutable _groups: option<[str]>,
+    // mutable _names: option<std::map<str, uint>>,
+};
 
 #[nolink]
 #[abi = "cdecl"]
@@ -206,6 +227,140 @@ native mod pcre {
                  options: c_int, ovector: * c_int, ovecsize: c_int) -> c_int;
     fn pcre_fullinfo(code: *pcre, extra: *pcre_extra,
                      what: c_int, where: *void) -> c_int;
+}
+
+impl pattern_util for pattern {
+    fn info_capture_count() -> uint {
+        let count = -1 as c_int;
+        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
+                            PCRE_INFO_CAPTURECOUNT as c_int,
+                            ptr::addr_of(count) as *void);
+        assert count >= 0 as c_int;
+        ret count as uint;
+    }
+
+    fn info_name_count() -> uint {
+        let count = -1 as c_int;
+        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
+                            PCRE_INFO_NAMECOUNT as c_int,
+                            ptr::addr_of(count) as *void);
+        assert count >= 0 as c_int;
+        ret count as uint;
+    }
+
+    fn info_name_entry_size() -> uint {
+        let size = -1 as c_int;
+        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
+                            PCRE_INFO_NAMEENTRYSIZE as c_int,
+                            ptr::addr_of(size) as *void);
+        assert size >= 0 as c_int;
+        ret size as uint;
+    }
+
+    fn with_name_table(blk: fn(*u8)) unsafe {
+        let table = ptr::null::<u8>();
+        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
+                            PCRE_INFO_NAMETABLE as c_int,
+                            ptr::addr_of(table) as *void);
+        assert table != ptr::null::<u8>();
+        blk(table);
+    }
+
+    fn group_count() -> uint {
+        ret self.info_capture_count();
+    }
+
+    fn group_names() -> [str] unsafe {
+        let count = self.info_name_count();
+        if count == 0u { ret []; }
+        let size = self.info_name_entry_size();
+        let names: [str] = [];
+        self.with_name_table {|table|
+            uint::range(0u, count) {|i|
+                let p = ptr::offset(table, size * i + 2u);
+                let s = str::from_cstr(p);
+                vec::push(names, s);
+            }
+        }
+        ret names;
+    }
+}
+
+iface pattern_like {
+    fn compile(options: int) -> compile_result;
+}
+
+impl of pattern_like for str {
+    fn compile(options: int) -> compile_result { compile(self, options) }
+}
+
+impl of pattern_like for pattern {
+    fn compile(_options: int) -> compile_result { ok(self) }
+}
+
+impl of pattern_like for compile_result {
+    fn compile(_options: int) -> compile_result { self }
+}
+
+impl match_util for match {
+    fn matched() -> str {
+        ret str::slice(self.subject, self.begin(), self.end());
+    }
+
+    fn prematch() -> str {
+        ret str::slice(self.subject, 0u, self.begin());
+    }
+
+    fn postmatch() -> str {
+        ret str::slice(self.subject ,self.end(),
+                       str::char_len(self.subject));
+    }
+
+    fn begin() -> uint {
+        ret self._captures[0];
+    }
+
+    fn end() -> uint {
+        ret self._captures[1];
+    }
+
+    fn group(idx: uint) -> option<str> {
+        if idx >= self.group_count() {
+            ret none;
+        }
+        ret some(str::slice(self.subject,
+                            self._captures[(idx + 1u) * 2u],
+                            self._captures[(idx + 1u) * 2u + 1u]));
+    }
+
+    fn named_group(name: str) -> option<str> {
+        (name);
+        fail;
+    }
+
+    fn groups() -> [str] {
+        let v = [];
+        vec::reserve(v, self.group_count());
+        self.groups_iter {|elt| vec::push(v, elt); }
+        ret v;
+    }
+
+    fn groups_iter(blk: fn(str)) {
+        uint::range(0u, self.group_count()) {|i|
+            alt self.group(i) {
+              some(s) { blk(s); }
+              none { fail; }
+            }
+        }
+    }
+
+    fn group_count() -> uint {
+        ret vec::len(self._captures) / 2u - 1u;
+    }
+
+    fn group_names() -> [str] {
+        ret self.pattern.group_names();
+    }
 }
 
 fn compile(pattern: str, options: int) -> compile_result unsafe {
@@ -272,147 +427,9 @@ fn exec(pattern: pattern,
     ret ok({subject: subject, pattern: pattern, _captures: captures});
 }
 
-type match = {
-    subject: str,
-    pattern: pattern,
-    _captures: [uint],
-    // FIXME: we may cache these values for reuse
-    // mutable _substrs: option<[str]>,
-    // mutable _names: option<std::map<str, uint>>,
-};
-
-impl pattern_util for pattern {
-    fn info_capture_count() -> uint {
-        let count = -1 as c_int;
-        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
-                            PCRE_INFO_CAPTURECOUNT as c_int,
-                            ptr::addr_of(count) as *void);
-        assert count >= 0 as c_int;
-        ret count as uint;
-    }
-
-    fn info_name_count() -> uint {
-        let count = -1 as c_int;
-        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
-                            PCRE_INFO_NAMECOUNT as c_int,
-                            ptr::addr_of(count) as *void);
-        assert count >= 0 as c_int;
-        ret count as uint;
-    }
-
-    fn info_name_entry_size() -> uint {
-        let size = -1 as c_int;
-        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
-                            PCRE_INFO_NAMEENTRYSIZE as c_int,
-                            ptr::addr_of(size) as *void);
-        assert size >= 0 as c_int;
-        ret size as uint;
-    }
-
-    fn with_name_table(blk: fn(*u8)) unsafe {
-        let table = ptr::null::<u8>();
-        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
-                            9 as c_int /* PCRE_INFO_NAMETABLE */,
-                            ptr::addr_of(table) as *void);
-        assert table != ptr::null::<u8>();
-        blk(table);
-    }
-
-    fn group_count() -> uint {
-        ret self.info_capture_count();
-    }
-
-    fn group_names() -> [str] unsafe {
-        let count = self.info_name_count();
-        if count == 0u { ret []; }
-        let size = self.info_name_entry_size();
-        let names: [str] = [];
-        self.with_name_table {|table|
-            uint::range(0u, count) {|i|
-                let p = ptr::offset(table, size * i + 2u);
-                let s = str::from_cstr(p);
-                vec::push(names, s);
-            }
-        }
-        ret names;
-    }
-}
-
-impl match_util for match {
-    fn matched() -> str {
-        ret str::slice(self.subject, self.begin(), self.end());
-    }
-
-    fn prematch() -> str {
-        ret str::slice(self.subject, 0u, self.begin());
-    }
-
-    fn postmatch() -> str {
-        ret str::slice(self.subject ,self.end(),
-                       str::char_len(self.subject));
-    }
-
-    fn begin() -> uint {
-        ret self._captures[0];
-    }
-
-    fn end() -> uint {
-        ret self._captures[1];
-    }
-
-    fn group(idx: uint) -> option<str> {
-        if idx >= self.group_count() {
-            ret none;
-        }
-        ret some(str::slice(self.subject,
-                            self._captures[(idx + 1u) * 2u],
-                            self._captures[(idx + 1u) * 2u + 1u]));
-    }
-
-    fn named_group(name: str) -> option<str> {
-        (name);
-        fail;
-    }
-
-    fn groups() -> [str] {
-        let v = [];
-        vec::reserve(v, self.group_count());
-        self.groups_iter {|elt| vec::push(v, elt); }
-        ret v;
-    }
-
-    fn groups_iter(blk: fn(str)) {
-        uint::range(0u, self.group_count()) {|i|
-            alt self.group(i) {
-              some(s) { blk(s); }
-              none { fail; }
-            }
-        }
-    }
-
-    fn group_count() -> uint {
-        ret vec::len(self._captures) / 2u - 1u;
-    }
-
-    fn group_names() -> [str] {
-        ret self.pattern.group_names();
-    }
-}
-
-iface pattern_like {
-    fn compile(options: int) -> compile_result;
-}
-
-impl of pattern_like for str {
-    fn compile(options: int) -> compile_result { compile(self, options) }
-}
-
-impl of pattern_like for pattern {
-    fn compile(_options: int) -> compile_result { ok(self) }
-}
-
-impl of pattern_like for compile_result {
-    fn compile(_options: int) -> compile_result { self }
+fn match<T: pattern_like>(pattern: T, subject: str,
+                          options: int) -> match_result {
+    ret match_from(pattern, subject, 0u, options);
 }
 
 fn match_from<T: pattern_like>(pattern: T, subject: str,
@@ -441,51 +458,27 @@ fn match_from<T: pattern_like>(pattern: T, subject: str,
     }
 }
 
-fn match<T: pattern_like>(pattern: T, subject: str,
-                          options: int) -> match_result {
-    ret match_from(pattern, subject, 0u, options);
-}
-
-fn fmt_compile_err(e: compile_err) -> str {
-    ret #fmt("error %d: %s at offset %u", e.code, e.reason, e.offset);
-}
-
-fn char_offset_from_byte_offset(s: str, byte_offset: uint) -> uint {
-    if byte_offset == 0u { ret 0u; }
-    let v = str::bytes(s);
-    let subv = vec::slice(v, 0u, byte_offset);
-    let subs = str::from_bytes(subv);
-    ret str::char_len(subs);
-}
-
-fn byte_offset_from_char_offset(s: str, char_offset: uint) -> uint {
-    if char_offset == 0u { ret 0u; }
-    let subs = str::slice(s, 0u, char_offset);
-    let v = str::bytes(subs);
-    ret vec::len(v);
-}
-
 fn replace<T: pattern_like>(pattern: T, subject: str, repl: str,
-                            options: int) -> result<str, either_err> {
+                            options: int) -> replace_result {
     ret replace_fn_from(pattern, subject, {|_m| repl }, 0u, options);
 }
 
 fn replace_from<T: pattern_like>(pattern: T, subject: str, repl: str,
                                  offset: uint, options: int)
-                                 -> result<str, either_err> {
+                                 -> replace_result {
     ret replace_fn_from(pattern, subject, {|_m| repl }, offset, options);
 }
 
 fn replace_fn<T: pattern_like>(pattern: T, subject: str,
                                repl_fn: fn(match) -> str, options: int)
-                               -> result<str, either_err> {
+                               -> replace_result {
     ret replace_fn_from(pattern, subject, repl_fn, 0u, options);
 }
 
 fn replace_fn_from<T: pattern_like>(pattern: T, subject: str,
                                     repl_fn: fn(match) -> str, offset: uint,
                                     options: int)
-                                    -> result<str, either_err> {
+                                    -> replace_result {
     let r = match_from(pattern, subject, offset, options);
     alt r {
       ok(m) {
@@ -498,14 +491,14 @@ fn replace_fn_from<T: pattern_like>(pattern: T, subject: str,
 fn replace_all<T: pattern_like>(pattern: T, subject: str,
                                 repl: str,
                                 options: int)
-                                -> result<str, either_err> {
+                                -> replace_result {
     ret replace_all_fn_from(pattern, subject, {|_m| repl }, 0u, options);
 }
 
 fn replace_all_fn<T: pattern_like>(pattern: T, subject: str,
                                    repl_fn: fn(match) -> str,
                                    options: int)
-                                   -> result<str, either_err> {
+                                   -> replace_result {
     ret replace_all_fn_from(pattern, subject, repl_fn, 0u, options);
 }
 
@@ -513,7 +506,7 @@ fn replace_all_from<T: pattern_like>(pattern: T, subject: str,
                                      repl: str,
                                      offset: uint,
                                      options: int)
-                                     -> result<str, either_err> {
+                                     -> replace_result {
     ret replace_all_fn_from(pattern, subject, {|_m| repl }, offset, options);
 }
 
@@ -521,7 +514,7 @@ fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
                                         repl_fn: fn(match) -> str,
                                         offset: uint,
                                         options: int)
-                                        -> result<str, either_err> {
+                                        -> replace_result {
     let offset = offset;
     let subject_len = str::char_len(subject);
     assert offset <= subject_len;
@@ -550,10 +543,29 @@ fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
     ret ok(s);
 }
 
+fn char_offset_from_byte_offset(s: str, byte_offset: uint) -> uint {
+    if byte_offset == 0u { ret 0u; }
+    let v = str::bytes(s);
+    let subv = vec::slice(v, 0u, byte_offset);
+    let subs = str::from_bytes(subv);
+    ret str::char_len(subs);
+}
+
+fn byte_offset_from_char_offset(s: str, char_offset: uint) -> uint {
+    if char_offset == 0u { ret 0u; }
+    let subs = str::slice(s, 0u, char_offset);
+    let v = str::bytes(subs);
+    ret vec::len(v);
+}
+
+fn fmt_compile_err(e: compile_err) -> str {
+    ret #fmt("error %d: %s at offset %u", e.code, e.reason, e.offset);
+}
+
 /*
 Function: is_nomatch
 
-Returns true iff mr indicates that the subject did not match the pattern
+Returns true iff mr indicates that the subject did not match the pattern.
 */
 pure fn is_nomatch(mr: match_result) -> bool {
     ret alt mr {
