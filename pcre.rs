@@ -387,16 +387,60 @@ fn replace_fn_from<T: pattern_like>(pattern: T, subject: str,
     }
 }
 
-//fn replace_all<T: pattern_like>(pattern: T, subject: str, repl: str,
-//                                options: int) -> result<str, either_err> {
-//    fail;
-//}
-//
-//fn replace_all_<T: pattern_like>(pattern: T, subject: str,
-//                                 repl_fn: fn(match) -> str, options: int)
-//                                 -> result<str, either_err> {
-//    fail;
-//}
+fn replace_all<T: pattern_like>(pattern: T, subject: str,
+                                repl: str,
+                                options: int)
+                                -> result<str, either_err> {
+    ret replace_all_fn_from(pattern, subject, {|_m| repl }, 0u, options);
+}
+
+fn replace_all_fn<T: pattern_like>(pattern: T, subject: str,
+                                   repl_fn: fn(match) -> str,
+                                   options: int)
+                                   -> result<str, either_err> {
+    ret replace_all_fn_from(pattern, subject, repl_fn, 0u, options);
+}
+
+fn replace_all_from<T: pattern_like>(pattern: T, subject: str,
+                                     repl: str,
+                                     offset: uint,
+                                     options: int)
+                                     -> result<str, either_err> {
+    ret replace_all_fn_from(pattern, subject, {|_m| repl }, offset, options);
+}
+
+fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
+                                        repl_fn: fn(match) -> str,
+                                        offset: uint,
+                                        options: int)
+                                        -> result<str, either_err> {
+    let offset = offset;
+    let subject_len = str::char_len(subject);
+    assert offset <= subject_len;
+
+    let s = "";
+    while true {
+        let r = match_from(pattern, subject, offset, options);
+        alt r {
+          ok(m) {
+            s += str::slice(subject, offset, m.begin());
+            s += repl_fn(m);
+            offset = m.end();
+          }
+          err(right(-1)) { // is nomatch
+            let rest_len = subject_len - offset;
+            if rest_len > 0u {
+                s += str::slice(subject, offset, rest_len);
+            }
+            break;
+          }
+          err(e) {
+            ret err(e);
+          }
+        }
+    }
+    ret ok(s);
+}
 
 /*
 Function: is_nomatch
@@ -489,6 +533,15 @@ mod test {
                                 {|m| str::to_upper(m.matched()) }, 2u, 0);
         alt r {
           ok(s) { assert s == "AbcdBCDE"; }
+          _ { fail; }
+        }
+    }
+
+    #[test]
+    fn test_replace_all() {
+        let r = replace_all("XX", "XXfooXXbarXXbazXX", "_", 0);
+        alt r {
+          ok(s) { assert s == "_foo_bar_baz_"; }
           _ { fail; }
         }
     }
