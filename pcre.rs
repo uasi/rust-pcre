@@ -324,13 +324,13 @@ impl match_util for match {
         ret self._captures[1];
     }
 
-    fn group(idx: uint) -> option<str> {
-        if idx >= self.group_count() {
+    fn group(i: uint) -> option<str> {
+        if i > self.group_count() {
             ret none;
         }
         ret some(str::slice(self.subject,
-                            self._captures[(idx + 1u) * 2u],
-                            self._captures[(idx + 1u) * 2u + 1u]));
+                            self._captures[i * 2u],
+                            self._captures[i * 2u + 1u]));
     }
 
     fn named_group(name: str) -> option<str> {
@@ -346,7 +346,7 @@ impl match_util for match {
     }
 
     fn groups_iter(blk: fn(str)) {
-        uint::range(0u, self.group_count()) {|i|
+        uint::range(1u, self.group_count() + 1u) {|i|
             alt self.group(i) {
               some(s) { blk(s); }
               none { fail; }
@@ -702,9 +702,10 @@ mod test_match_like {
         let r = match("(foo)bar(baz)", "foobarbaz", 0);
         alt r {
           ok(m) {
-            alt m.group(0u) { some(s) { assert s == "foo"; } _ { fail; } }
-            alt m.group(1u) { some(s) { assert s == "baz"; } _ { fail; } }
-            alt m.group(2u) { none { assert true; } _ { fail; } }
+            alt m.group(0u) { some(s) { assert s == "foobarbaz"; } _ { fail; } }
+            alt m.group(1u) { some(s) { assert s == "foo"; } _ { fail; } }
+            alt m.group(2u) { some(s) { assert s == "baz"; } _ { fail; } }
+            alt m.group(3u) { none { assert true; } _ { fail; } }
           }
           _ { fail; }
         }
