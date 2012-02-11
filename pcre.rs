@@ -137,19 +137,14 @@ fn compile(pattern: str, options: int) -> compile_result unsafe {
 
 fn exec(pattern: pattern,
         subject: str, offset: uint,
-        options: int, count_FIXME: int) -> exec_result unsafe {
-    // FIXME: Weirdly pcre_fullinfo() doesn't work inside exec().
-    //        It yields 0, which means success, but the 4th arg isn't updated.
-    //let count = 0 as c_int;
-    //pcre::pcre_fullinfo(**(pattern._pcre_res), ptr::null(),
-    //                    2 as c_int /* PCRE_INFO_CAPTURECOUNT */,
-    //                    ptr::addr_of(count));
-    let count = (count_FIXME + 1) as c_int;
+        options: int) -> exec_result unsafe {
 
     let offset = byte_offset_from_char_offset(subject, offset);
     let options = options | PCRE_NO_UTF8_CHECK; // str is always valid
 
+    let count = (pattern.info_capture_count() + 1u) as c_int;
     let ovec = vec::init_elt((count as uint) * 3u, 0u as c_int);
+
     let ret_code = str::as_buf(subject) {|s|
         pcre::pcre_exec(**(pattern._pcre_res), ptr::null(),
                         s as *c_char, str::byte_len(subject) as c_int,
@@ -330,12 +325,7 @@ fn match_from<T: pattern_like>(pattern: T, subject: str,
     let c = pattern.compile();
     alt c {
       ok(p) {
-        // FIXME: see exec()
-        let count_FIXME = 0 as c_int;
-        pcre::pcre_fullinfo(**(p._pcre_res), ptr::null(),
-                            2 as c_int /* PCRE_INFO_CAPTURECOUNT */,
-                            ptr::addr_of(count_FIXME) as *void);
-        let e = exec(p, subject, offset, options, count_FIXME as int);
+        let e = exec(p, subject, offset, options);
         alt e {
           ok(match) {
             ret ok(match);
