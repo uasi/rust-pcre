@@ -42,6 +42,56 @@ const PCRE_PARTIAL_HARD: int      = 0x08000000; // Exec, DFA exec
 const PCRE_NOTEMPTY_ATSTART: int  = 0x10000000; // Exec, DFA exec
 const PCRE_UCP: int               = 0x20000000; // Compile
 
+const COMPILE_OPTIONS: int        = 0x27fc7a7f;
+const EXEC_OPTIONS: int           = 0x1df0a590;
+
+//const COMPILE_OPTIONS: int =
+//    PCRE_CASELESS
+//  | PCRE_MULTILINE
+//  | PCRE_DOTALL
+//  | PCRE_EXTENDED
+//  | PCRE_ANCHORED
+//  | PCRE_DOLLAR_ENDONLY
+//  | PCRE_EXTRA
+//  | PCRE_UNGREEDY
+//  | PCRE_UTF8
+//  | PCRE_NO_AUTO_CAPTURE
+//  | PCRE_NO_UTF8_CHECK
+//  | PCRE_AUTO_CALLOUT
+//  | PCRE_FIRSTLINE
+//  | PCRE_DUPNAMES
+//  | PCRE_NEWLINE_CR
+//  | PCRE_NEWLINE_LF
+//  | PCRE_NEWLINE_CRLF
+//  | PCRE_NEWLINE_ANY
+//  | PCRE_NEWLINE_ANYCRLF
+//  | PCRE_BSR_ANYCRLF
+//  | PCRE_BSR_UNICODE
+//  | PCRE_JAVASCRIPT_COMPAT
+//  | PCRE_NO_START_OPTIMIZE
+//  | PCRE_NO_START_OPTIMISE
+//  | PCRE_UCP;
+
+//const EXEC_OPTIONS: int =
+//    PCRE_ANCHORED
+//  | PCRE_NOTBOL
+//  | PCRE_NOTEOL
+//  | PCRE_NOTEMPTY
+//  | PCRE_NO_UTF8_CHECK
+//  | PCRE_PARTIAL_SOFT
+//  | PCRE_PARTIAL
+//  | PCRE_NEWLINE_CR
+//  | PCRE_NEWLINE_LF
+//  | PCRE_NEWLINE_CRLF
+//  | PCRE_NEWLINE_ANY
+//  | PCRE_NEWLINE_ANYCRLF
+//  | PCRE_BSR_ANYCRLF
+//  | PCRE_BSR_UNICODE
+//  | PCRE_NO_START_OPTIMIZE
+//  | PCRE_NO_START_OPTIMISE
+//  | PCRE_PARTIAL_HARD
+//  | PCRE_NOTEMPTY_ATSTART;
+
 enum pcre {}
 enum pcre_extra {}
 resource pcre_res(p: *pcre) {
@@ -114,6 +164,10 @@ native mod pcre {
 }
 
 fn compile(pattern: str, options: int) -> compile_result unsafe {
+    if options | COMPILE_OPTIONS != COMPILE_OPTIONS {
+        #warn("unrecognized option bit(s) are set");
+    }
+
     let options = options | PCRE_NO_UTF8_CHECK; // str is always valid
     let errcode = 0 as c_int;
     let errreason: *c_char = ptr::null();
@@ -138,6 +192,10 @@ fn compile(pattern: str, options: int) -> compile_result unsafe {
 fn exec(pattern: pattern,
         subject: str, offset: uint,
         options: int) -> exec_result unsafe {
+
+    if (options | EXEC_OPTIONS) != EXEC_OPTIONS {
+        #warn("unrecognized option bit(s) are set");
+    }
 
     let offset = byte_offset_from_char_offset(subject, offset);
     let options = options | PCRE_NO_UTF8_CHECK; // str is always valid
@@ -297,28 +355,32 @@ impl match_util for match {
 }
 
 iface pattern_like {
-    fn compile() -> compile_result;
+    fn compile(options: int) -> compile_result;
 }
 
 impl of pattern_like for str {
-    fn compile() -> compile_result { compile(self, 0) }
+    fn compile(options: int) -> compile_result { compile(self, options) }
 }
 
 impl of pattern_like for pattern {
-    fn compile() -> compile_result { ok(self) }
+    fn compile(_options: int) -> compile_result { ok(self) }
 }
 
 impl of pattern_like for compile_result {
-    fn compile() -> compile_result { self }
+    fn compile(_options: int) -> compile_result { self }
 }
 
 fn match_from<T: pattern_like>(pattern: T, subject: str,
                                offset: uint, options: int) -> match_result {
     assert offset <= str::char_len(subject);
-    let c = pattern.compile();
+
+    let c_opts = options & COMPILE_OPTIONS;
+    let e_opts = options & EXEC_OPTIONS;
+
+    let c = pattern.compile(c_opts);
     alt c {
       ok(p) {
-        let e = exec(p, subject, offset, options);
+        let e = exec(p, subject, offset, e_opts);
         alt e {
           ok(match) {
             ret ok(match);
@@ -498,6 +560,34 @@ mod test {
 
         let r = match("(foo)bar", "baz", 0);
         assert is_nomatch(r);
+    }
+
+    // compile() accepts compile options (obviously)
+    #[test]
+    fn test_match_options_0() {
+        let r = match(compile("foobar", PCRE_CASELESS), "FOOBAR", 0);
+        assert success(r);
+    }
+
+    // match() accepts compile options
+    #[test]
+    fn test_match_options_1() {
+        let r = match("foobar", "FOOBAR", PCRE_CASELESS);
+        assert success(r);
+    }
+
+    // inline options supersedes match-time compile options
+    #[test]
+    fn test_match_options_2() {
+        let r = match("(?-i)foobar", "FOOBAR", PCRE_CASELESS);
+        assert failure(r);
+    }
+
+    // compile-time compile options supersedes match-time compile options
+    #[test]
+    fn test_match_options_3() {
+        let r = match(compile("foobar", 0), "FOOBAR", PCRE_CASELESS);
+        assert failure(r);
     }
 
     #[test]
