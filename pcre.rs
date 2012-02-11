@@ -578,7 +578,7 @@ pure fn is_nomatch(mr: match_result) -> bool {
     };
 }
 
-#[test]
+#[cfg(test)]
 mod test {
     import result::*;
 
@@ -699,7 +699,7 @@ mod test {
     }
 }
 
-#[test]
+#[cfg(test)]
 mod test_match_like {
     #[test]
     fn test_group() {
