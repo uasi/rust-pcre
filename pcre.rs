@@ -92,6 +92,51 @@ const EXEC_OPTIONS: int           = 0x1df0a590;
 //  | PCRE_PARTIAL_HARD
 //  | PCRE_NOTEMPTY_ATSTART;
 
+const PCRE_ERROR_NOMATCH: int        =  -1;
+const PCRE_ERROR_NULL: int           =  -2;
+const PCRE_ERROR_BADOPTION: int      =  -3;
+const PCRE_ERROR_BADMAGIC: int       =  -4;
+const PCRE_ERROR_UNKNOWN_OPCODE: int =  -5;
+const PCRE_ERROR_UNKNOWN_NODE: int   =  -5;  // For backward compatibility
+const PCRE_ERROR_NOMEMORY: int       =  -6;
+const PCRE_ERROR_NOSUBSTRING: int    =  -7;
+const PCRE_ERROR_MATCHLIMIT: int     =  -8;
+const PCRE_ERROR_CALLOUT: int        =  -9;  // Never used by PCRE itself
+const PCRE_ERROR_BADUTF8: int        = -10;
+const PCRE_ERROR_BADUTF8_OFFSET: int = -11;
+const PCRE_ERROR_PARTIAL: int        = -12;
+const PCRE_ERROR_BADPARTIAL: int     = -13;
+const PCRE_ERROR_INTERNAL: int       = -14;
+const PCRE_ERROR_BADCOUNT: int       = -15;
+const PCRE_ERROR_DFA_UITEM: int      = -16;
+const PCRE_ERROR_DFA_UCOND: int      = -17;
+const PCRE_ERROR_DFA_UMLIMIT: int    = -18;
+const PCRE_ERROR_DFA_WSSIZE: int     = -19;
+const PCRE_ERROR_DFA_RECURSE: int    = -20;
+const PCRE_ERROR_RECURSIONLIMIT: int = -21;
+const PCRE_ERROR_NULLWSLIMIT: int    = -22;  // No longer actually used
+const PCRE_ERROR_BADNEWLINE: int     = -23;
+const PCRE_ERROR_BADOFFSET: int      = -24;
+const PCRE_ERROR_SHORTUTF8: int      = -25;
+
+const PCRE_INFO_OPTIONS: int         =   0;
+const PCRE_INFO_SIZE: int            =   1;
+const PCRE_INFO_CAPTURECOUNT: int    =   2;
+const PCRE_INFO_BACKREFMAX: int      =   3;
+const PCRE_INFO_FIRSTBYTE: int       =   4;
+const PCRE_INFO_FIRSTCHAR: int       =   4; // For backwards compatibility
+const PCRE_INFO_FIRSTTABLE: int      =   5;
+const PCRE_INFO_LASTLITERAL: int     =   6;
+const PCRE_INFO_NAMEENTRYSIZE: int   =   7;
+const PCRE_INFO_NAMECOUNT: int       =   8;
+const PCRE_INFO_NAMETABLE: int       =   9;
+const PCRE_INFO_STUDYSIZE: int       =  10;
+const PCRE_INFO_DEFAULT_TABLES: int  =  11;
+const PCRE_INFO_OKPARTIAL: int       =  12;
+const PCRE_INFO_JCHANGED: int        =  13;
+const PCRE_INFO_HASCRORLF: int       =  14;
+const PCRE_INFO_MINLENGTH: int       =  15;
+
 enum pcre {}
 enum pcre_extra {}
 resource pcre_res(p: *pcre) {
@@ -240,7 +285,7 @@ impl pattern_util for pattern {
     fn info_capture_count() -> uint {
         let count = -1 as c_int;
         pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
-                            2 as c_int /* PCRE_INFO_CAPTURECOUNT */,
+                            PCRE_INFO_CAPTURECOUNT as c_int,
                             ptr::addr_of(count) as *void);
         assert count >= 0 as c_int;
         ret count as uint;
@@ -249,7 +294,7 @@ impl pattern_util for pattern {
     fn info_name_count() -> uint {
         let count = -1 as c_int;
         pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
-                            8 as c_int /* PCRE_INFO_NAMECOUNT */,
+                            PCRE_INFO_NAMECOUNT as c_int,
                             ptr::addr_of(count) as *void);
         assert count >= 0 as c_int;
         ret count as uint;
@@ -258,7 +303,7 @@ impl pattern_util for pattern {
     fn info_name_entry_size() -> uint {
         let size = -1 as c_int;
         pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
-                            7 as c_int /* PCRE_INFO_NAMEENTRYSIZE */,
+                            PCRE_INFO_NAMEENTRYSIZE as c_int,
                             ptr::addr_of(size) as *void);
         assert size >= 0 as c_int;
         ret size as uint;
@@ -490,7 +535,7 @@ fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
             s += repl_fn(m);
             offset = m.end();
           }
-          err(right(-1)) { // is nomatch
+          err(right(PCRE_ERROR_NOMATCH)) {
             let rest_len = subject_len - offset;
             if rest_len > 0u {
                 s += str::slice(subject, offset, rest_len);
@@ -512,7 +557,7 @@ Returns true iff mr indicates that the subject did not match the pattern
 */
 pure fn is_nomatch(mr: match_result) -> bool {
     ret alt mr {
-      err(right(-1)) { true }
+      err(right(PCRE_ERROR_NOMATCH)) { true }
       _ { false }
     };
 }
