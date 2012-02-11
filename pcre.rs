@@ -227,6 +227,7 @@ native mod pcre {
                  options: c_int, ovector: * c_int, ovecsize: c_int) -> c_int;
     fn pcre_fullinfo(code: *pcre, extra: *pcre_extra,
                      what: c_int, where: *void) -> c_int;
+    fn pcre_get_stringnumber(code: *pcre, name: *c_char) -> c_int;
 }
 
 impl pattern_util for pattern {
@@ -334,8 +335,11 @@ impl match_util for match {
     }
 
     fn named_group(name: str) -> option<str> {
-        (name);
-        fail;
+        let i = str::as_buf(name) {|s|
+            pcre::pcre_get_stringnumber(**self.pattern._pcre_res, s as *c_char)
+        };
+        if i <= 0 as c_int { ret none; }
+        ret self.group(i as uint);
     }
 
     fn subgroups() -> [str] {
@@ -771,6 +775,24 @@ mod test_match_like {
         alt r {
           ok(m) {
             assert vec::all2(m.group_names(), ["foo_name"]) {|s, t| s == t };
+          }
+          _ { fail; }
+        }
+    }
+
+    #[test]
+    fn test_named_group() {
+        let r = match("(?<foo_name>f..)bar", "foobar", 0);
+        alt r {
+          ok(m) {
+            alt m.named_group("foo_name") {
+              some(s) { assert s == "foo"; }
+              _ { fail; }
+            }
+            alt m.named_group("nonexistent") {
+              none { assert true; }
+              _ { fail; }
+            }
           }
           _ { fail; }
         }
