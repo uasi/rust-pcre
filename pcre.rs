@@ -105,7 +105,7 @@ native mod pcre {
                  subject: *c_char, length: c_int, startoffset: c_int,
                  options: c_int, ovector: * c_int, ovecsize: c_int) -> c_int;
     fn pcre_fullinfo(code: *pcre, extra: *pcre_extra,
-                     what: c_int, where: *c_int) -> c_int;
+                     what: c_int, where: *void) -> c_int;
 }
 
 fn compile(pattern: str, options: int) -> compile_result unsafe {
@@ -178,6 +178,37 @@ type match = {
     // mutable _names: option<std::map<str, uint>>,
 };
 
+// FIXME: should be pcre_res_util
+impl match_info_util for match {
+    fn info_name_count() -> uint {
+        let count = -1 as c_int;
+        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
+                            8 as c_int /* PCRE_INFO_NAMECOUNT */,
+                            ptr::addr_of(count) as *void);
+        assert count >= 0 as c_int;
+        ret count as uint;
+    }
+
+    fn info_name_entry_size() -> uint {
+        let size = -1 as c_int;
+        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
+                            7 as c_int /* PCRE_INFO_NAMEENTRYSIZE */,
+                            ptr::addr_of(size) as *void);
+        assert size >= 0 as c_int;
+        ret size as uint;
+    }
+
+    // NOTE: impl cannot have an unsafe fn (a bug?)
+    //unsafe fn info_name_table() -> *u8 { ptr::null() }
+    fn with_name_table(blk: fn(*u8)) unsafe {
+        let table = ptr::null::<u8>();
+        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
+                            9 as c_int /* PCRE_INFO_NAMETABLE */,
+                            ptr::addr_of(table) as *void);
+        blk(table);
+    }
+}
+
 iface match_like {
     fn matched() -> str;
     fn prematch() -> str;
@@ -249,8 +280,19 @@ impl of match_like for match {
         ret vec::len(self._captures) / 2u - 1u;
     }
 
-    fn group_names() -> [str] {
-        fail;
+    fn group_names() -> [str] unsafe {
+        let count = self.info_name_count();
+        if count == 0u { ret []; }
+        let size = self.info_name_entry_size();
+        let names: [str] = [];
+        self.with_name_table {|table|
+            uint::range(0u, count) {|i|
+                let p = ptr::offset(table, size * i + 2u);
+                let s = str::from_cstr(p);
+                vec::push(names, s);
+            }
+        }
+        ret names;
     }
 }
 
@@ -279,7 +321,7 @@ fn match_from<T: pattern_like>(pattern: T, subject: str,
         let count_FIXME = 0 as c_int;
         pcre::pcre_fullinfo(**p, ptr::null(),
                             2 as c_int /* PCRE_INFO_CAPTURECOUNT */,
-                            ptr::addr_of(count_FIXME));
+                            ptr::addr_of(count_FIXME) as *void);
         let e = exec(p, subject, offset, options, count_FIXME as int);
         alt e {
           ok(match) {
@@ -516,6 +558,17 @@ mod test_match_like {
         alt r {
           ok(m) {
             assert m.group_count() == 0u;
+          }
+          _ { fail; }
+        }
+    }
+
+    #[test]
+    fn test_group_names() {
+        let r = match("(?<foo_name>foo)bar", "foobar", 0);
+        alt r {
+          ok(m) {
+            assert vec::all2(m.group_names(), ["foo_name"]) {|s, t| s == t };
           }
           _ { fail; }
         }
