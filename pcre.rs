@@ -215,6 +215,25 @@ impl pattern_util for pattern {
                             ptr::addr_of(table) as *void);
         blk(table);
     }
+
+    fn group_count() -> uint {
+        ret self.info_capture_count();
+    }
+
+    fn group_names() -> [str] unsafe {
+        let count = self.info_name_count();
+        if count == 0u { ret []; }
+        let size = self.info_name_entry_size();
+        let names: [str] = [];
+        self.with_name_table {|table|
+            uint::range(0u, count) {|i|
+                let p = ptr::offset(table, size * i + 2u);
+                let s = str::from_cstr(p);
+                vec::push(names, s);
+            }
+        }
+        ret names;
+    }
 }
 
 iface match_like {
@@ -288,19 +307,8 @@ impl of match_like for match {
         ret vec::len(self._captures) / 2u - 1u;
     }
 
-    fn group_names() -> [str] unsafe {
-        let count = self.pattern.info_name_count();
-        if count == 0u { ret []; }
-        let size = self.pattern.info_name_entry_size();
-        let names: [str] = [];
-        self.pattern.with_name_table {|table|
-            uint::range(0u, count) {|i|
-                let p = ptr::offset(table, size * i + 2u);
-                let s = str::from_cstr(p);
-                vec::push(names, s);
-            }
-        }
-        ret names;
+    fn group_names() -> [str] {
+        ret self.pattern.group_names();
     }
 }
 
@@ -437,15 +445,15 @@ mod test {
 
     #[test]
     fn test_match() {
-        let p = match("(foo)bar", "foobar", 0);
-        assert success(p);
+        let r = match("(foo)bar", "foobar", 0);
+        assert success(r);
 
         let c = compile("(foo)bar", 0);
-        let p = match(c, "foobar", 0);
-        assert success(p);
+        let r = match(c, "foobar", 0);
+        assert success(r);
 
-        let p = match("foo(", "foobar", 0);
-        alt p {
+        let r = match("foo(", "foobar", 0);
+        alt r {
           err(left(e)) {
             assert e.code == 14;
             assert e.reason == "missing )";
@@ -454,8 +462,8 @@ mod test {
           _ { fail; }
         }
 
-        let p = match("(foo)bar", "baz", 0);
-        assert is_nomatch(p);
+        let r = match("(foo)bar", "baz", 0);
+        assert is_nomatch(r);
     }
 
     #[test]
