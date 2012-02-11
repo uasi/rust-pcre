@@ -1,7 +1,6 @@
 use std;
 
 import core::ctypes::*;
-// import core::either::{compile_err, match_err};
 import core::option::{some, none};
 import core::result::{ok, err};
 import either = core::either::t;
