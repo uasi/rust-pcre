@@ -29,6 +29,10 @@ export replace_all_fn_from;
 export fmt_compile_err;
 export is_nomatch;
 
+// iface
+export pattern_like;
+export match_util;
+
 import core::ctypes::*;
 import core::option::{some, none};
 import core::result::{ok, err};
