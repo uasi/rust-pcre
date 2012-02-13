@@ -349,7 +349,7 @@ impl match_util for match {
 
     fn postmatch() -> str {
         ret str::slice(self.subject ,self.end(),
-                       str::char_len(self.subject));
+                       str::len_chars(self.subject));
     }
 
     fn begin() -> uint {
@@ -444,7 +444,7 @@ fn exec(pattern: pattern,
 
     let ret_code = str::as_buf(subject) {|s|
         pcre::pcre_exec(**(pattern._pcre_res), ptr::null(),
-                        s as *c_char, str::byte_len(subject) as c_int,
+                        s as *c_char, str::len_bytes(subject) as c_int,
                         offset as c_int, options as c_int,
                         vec::to_ptr(ovec) as *c_int,
                         count * (3 as c_int)) as int
@@ -473,7 +473,7 @@ fn match<T: pattern_like>(pattern: T, subject: str,
 
 fn match_from<T: pattern_like>(pattern: T, subject: str,
                                offset: uint, options: int) -> match_result {
-    assert offset <= str::char_len(subject);
+    assert offset <= str::len_chars(subject);
 
     let c_opts = options & COMPILE_OPTIONS;
     let e_opts = options & EXEC_OPTIONS;
@@ -555,7 +555,7 @@ fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
                                         options: int)
                                         -> replace_result {
     let offset = offset;
-    let subject_len = str::char_len(subject);
+    let subject_len = str::len_chars(subject);
     assert offset <= subject_len;
 
     let s = "";
@@ -587,7 +587,7 @@ fn char_offset_from_byte_offset(s: str, byte_offset: uint) -> uint {
     let v = str::bytes(s);
     let subv = vec::slice(v, 0u, byte_offset);
     let subs = str::from_bytes(subv);
-    ret str::char_len(subs);
+    ret str::len_chars(subs);
 }
 
 fn byte_offset_from_char_offset(s: str, char_offset: uint) -> uint {
