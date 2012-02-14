@@ -33,6 +33,9 @@ export is_nomatch;
 export pattern_like;
 export match_util;
 
+// mod
+//export const;
+
 import core::ctypes::*;
 import core::option::{some, none};
 import core::result::{ok, err};
@@ -587,17 +590,14 @@ fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
 
 fn char_offset_from_byte_offset(s: str, byte_offset: uint) -> uint {
     if byte_offset == 0u { ret 0u; }
-    let v = str::bytes(s);
-    let subv = vec::slice(v, 0u, byte_offset);
-    let subs = str::from_bytes(subv);
+    let subs = str::as_buf(s) {|b| str::from_cstr_len(b, byte_offset) };
     ret str::len_chars(subs);
 }
 
 fn byte_offset_from_char_offset(s: str, char_offset: uint) -> uint {
     if char_offset == 0u { ret 0u; }
     let subs = str::slice(s, 0u, char_offset);
-    let v = str::bytes(subs);
-    ret vec::len(v);
+    ret str::len_bytes(subs);
 }
 
 fn fmt_compile_err(e: compile_err) -> str {
