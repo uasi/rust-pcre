@@ -181,57 +181,43 @@ resource pcre_res(p: *pcre) {
     c::free(p as *c_void);
 }
 
-/*
-Type: compile_result
-
+#[doc = "
 The result type of <compile>.
-*/
+"]
 type compile_result = result<pattern, compile_err>;
 
-/*
-Type: exec_result
-
+#[doc = "
 The result type of <exec>.
-*/
+"]
 type exec_result = result<match, match_err>;
 
-/*
-Type: match_result
-
+#[doc = "
 The result type of <match>.
-*/
+"]
 type match_result = result<match, either_err>;
 
-/*
-Type: replace_result
-
+#[doc = "
 The result type of <replace>.
-*/
+"]
 type replace_result = result<str, either_err>;
 
-/*
-Type: compile_err
-
+#[doc = "
 The type that represents compile error.
-*/
+"]
 type compile_err = {
     code: int,
     reason: str,
     offset: uint,
 };
 
-/*
-Type: match_err
-
+#[doc = "
 The type that represents match error.
-*/
+"]
 type match_err = int;
 
-/*
-Enum: either_err
-
+#[doc = "
 Either compile or match error.
-*/
+"]
 enum either_err {
     compile_err(compile_err),
     match_err(match_err),
@@ -606,11 +592,9 @@ fn fmt_compile_err(e: compile_err) -> str {
     ret #fmt("error %d: %s at offset %u", e.code, e.reason, e.offset);
 }
 
-/*
-Function: is_nomatch
-
+#[doc = "
 Returns true iff mr indicates that the subject did not match the pattern.
-*/
+"]
 pure fn is_nomatch(mr: match_result) -> bool {
     ret alt mr {
       err(match_err(PCRE_ERROR_NOMATCH)) { true }
