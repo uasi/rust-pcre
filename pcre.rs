@@ -412,10 +412,9 @@ fn compile(pattern: str, options: int) -> compile_result unsafe {
                             ptr::null())
     };
     if p == ptr::null() {
-        let offset = char_offset_from_byte_offset(pattern, erroffset as uint);
         ret err({code: errcode as int,
                  reason: str::unsafe::from_c_str(errreason),
-                 offset: offset});
+                 offset: erroffset as uint});
     }
     ret ok({str: pattern, _pcre_res: @pcre_res(p)});
 }
@@ -428,7 +427,6 @@ fn exec(pattern: pattern,
         #warn("unrecognized option bit(s) are set");
     }
 
-    let offset = byte_offset_from_char_offset(subject, offset);
     let options = options | PCRE_NO_UTF8_CHECK; // str is always valid
 
     let count = (pattern.info_capture_count() + 1u) as c_int;
@@ -451,7 +449,7 @@ fn exec(pattern: pattern,
     vec::reserve(captures, vec::len(ovec));
     for o in ovec {
         if o as int < 0 { cont; }
-        vec::push(captures, char_offset_from_byte_offset(subject, o as uint));
+        vec::push(captures, o as uint);
     }
     assert vec::len(captures) % 2u == 0u;
 
@@ -465,7 +463,7 @@ fn match<T: pattern_like>(pattern: T, subject: str,
 
 fn match_from<T: pattern_like>(pattern: T, subject: str,
                                offset: uint, options: int) -> match_result {
-    assert offset <= str::char_len(subject);
+    assert offset <= str::len(subject);
 
     let c_opts = options & COMPILE_OPTIONS;
     let e_opts = options & EXEC_OPTIONS;
@@ -547,7 +545,7 @@ fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
                                         options: int)
                                         -> replace_result {
     let mut offset = offset;
-    let subject_len = str::char_len(subject);
+    let subject_len = str::len(subject);
     assert offset <= subject_len;
 
     let mut s = "";
@@ -572,20 +570,6 @@ fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
         }
     }
     ret ok(s);
-}
-
-fn char_offset_from_byte_offset(s: str, byte_offset: uint) -> uint unsafe {
-    if byte_offset == 0u { ret 0u; }
-    let subs = str::as_buf(s) {|b|
-      str::unsafe::from_c_str_len(b as *c_char, byte_offset)
-    };
-    ret str::char_len(subs);
-}
-
-fn byte_offset_from_char_offset(s: str, char_offset: uint) -> uint {
-    if char_offset == 0u { ret 0u; }
-    let subs = str::slice(s, 0u, char_offset);
-    ret str::len(subs);
 }
 
 fn fmt_compile_err(e: compile_err) -> str {
