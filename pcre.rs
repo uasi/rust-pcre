@@ -717,6 +717,14 @@ mod test {
 
         let r = match("(foo)bar", "baz", 0);
         assert is_nomatch(r);
+
+        let r = match("はにほ", "いろはにほへと", 0);
+        assert r.is_ok();
+        assert result::get(r).begin() == 6u;
+        assert result::get(r).end() == 15u;
+
+        let r = match("ちりぬ", "いろはにほへと", 0);
+        assert is_nomatch(r);
     }
 
     // compile() accepts compile options (obviously)
