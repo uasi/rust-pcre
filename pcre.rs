@@ -36,11 +36,11 @@ export match_util;
 // mod
 //export const;
 
-import core::ctypes::*;
+import core::libc::{c_char, c_int, c_void};
 import core::option::{some, none};
 import core::result::{ok, err};
-import either = core::either::t;
-import result = core::result::t;
+import core::either::either;
+import core::result::result;
 
 import const::*;
 mod const {
@@ -178,7 +178,7 @@ mod const {
 enum pcre {}
 enum pcre_extra {}
 resource pcre_res(p: *pcre) {
-    c::free(p as *void);
+    c::free(p as *c_void);
 }
 
 /*
@@ -254,7 +254,7 @@ type match = {
 #[nolink]
 #[abi = "cdecl"]
 native mod c {
-    fn free(p: *void);
+    fn free(p: *c_void);
 }
 
 #[abi = "cdecl"]
@@ -267,7 +267,7 @@ native mod pcre {
                  subject: *c_char, length: c_int, startoffset: c_int,
                  options: c_int, ovector: * c_int, ovecsize: c_int) -> c_int;
     fn pcre_fullinfo(code: *pcre, extra: *pcre_extra,
-                     what: c_int, where: *void) -> c_int;
+                     what: c_int, where: *c_void) -> c_int;
     fn pcre_get_stringnumber(code: *pcre, name: *c_char) -> c_int;
 }
 
@@ -276,7 +276,7 @@ impl pattern_util for pattern {
         let count = -1 as c_int;
         pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
                             PCRE_INFO_CAPTURECOUNT as c_int,
-                            ptr::addr_of(count) as *void);
+                            ptr::addr_of(count) as *c_void);
         assert count >= 0 as c_int;
         ret count as uint;
     }
@@ -285,7 +285,7 @@ impl pattern_util for pattern {
         let count = -1 as c_int;
         pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
                             PCRE_INFO_NAMECOUNT as c_int,
-                            ptr::addr_of(count) as *void);
+                            ptr::addr_of(count) as *c_void);
         assert count >= 0 as c_int;
         ret count as uint;
     }
@@ -294,7 +294,7 @@ impl pattern_util for pattern {
         let size = -1 as c_int;
         pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
                             PCRE_INFO_NAMEENTRYSIZE as c_int,
-                            ptr::addr_of(size) as *void);
+                            ptr::addr_of(size) as *c_void);
         assert size >= 0 as c_int;
         ret size as uint;
     }
@@ -303,7 +303,7 @@ impl pattern_util for pattern {
         let table = ptr::null::<u8>();
         pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
                             PCRE_INFO_NAMETABLE as c_int,
-                            ptr::addr_of(table) as *void);
+                            ptr::addr_of(table) as *c_void);
         assert table != ptr::null::<u8>();
         blk(table);
     }
@@ -316,11 +316,11 @@ impl pattern_util for pattern {
         let count = self.info_name_count();
         if count == 0u { ret []; }
         let size = self.info_name_entry_size();
-        let names: [str] = [];
+        let mut names: [str] = [];
         self.with_name_table {|table|
             uint::range(0u, count) {|i|
                 let p = ptr::offset(table, size * i + 2u);
-                let s = str::from_cstr(p);
+                let s = str::unsafe::from_c_str(p as *c_char);
                 vec::push(names, s);
             }
         }
@@ -355,7 +355,7 @@ impl match_util for match {
 
     fn postmatch() -> str {
         ret str::slice(self.subject ,self.end(),
-                       str::len_chars(self.subject));
+                       str::char_len(self.subject));
     }
 
     fn begin() -> uint {
@@ -384,7 +384,7 @@ impl match_util for match {
     }
 
     fn subgroups() -> [str] {
-        let v = [];
+        let mut v = [];
         vec::reserve(v, self.group_count());
         self.subgroups_iter {|elt| vec::push(v, elt); }
         ret v;
@@ -428,7 +428,7 @@ fn compile(pattern: str, options: int) -> compile_result unsafe {
     if p == ptr::null() {
         let offset = char_offset_from_byte_offset(pattern, erroffset as uint);
         ret err({code: errcode as int,
-                 reason: str::from_cstr(errreason as *u8),
+                 reason: str::unsafe::from_c_str(errreason),
                  offset: offset});
     }
     ret ok({str: pattern, _pcre_res: @pcre_res(p)});
@@ -446,13 +446,13 @@ fn exec(pattern: pattern,
     let options = options | PCRE_NO_UTF8_CHECK; // str is always valid
 
     let count = (pattern.info_capture_count() + 1u) as c_int;
-    let ovec = vec::init_elt((count as uint) * 3u, 0u as c_int);
+    let mut ovec = vec::from_elem((count as uint) * 3u, 0u as c_int);
 
     let ret_code = str::as_buf(subject) {|s|
         pcre::pcre_exec(**(pattern._pcre_res), ptr::null(),
-                        s as *c_char, str::len_bytes(subject) as c_int,
+                        s as *c_char, str::len(subject) as c_int,
                         offset as c_int, options as c_int,
-                        vec::to_ptr(ovec) as *c_int,
+                        vec::unsafe::to_ptr(ovec) as *c_int,
                         count * (3 as c_int)) as int
     };
 
@@ -461,7 +461,7 @@ fn exec(pattern: pattern,
     // cut off the working space
     vec::unsafe::set_len(ovec, count as uint * 2u);
 
-    let captures: [uint] = [];
+    let mut captures: [uint] = [];
     vec::reserve(captures, vec::len(ovec));
     for o in ovec {
         if o as int < 0 { cont; }
@@ -479,7 +479,7 @@ fn match<T: pattern_like>(pattern: T, subject: str,
 
 fn match_from<T: pattern_like>(pattern: T, subject: str,
                                offset: uint, options: int) -> match_result {
-    assert offset <= str::len_chars(subject);
+    assert offset <= str::char_len(subject);
 
     let c_opts = options & COMPILE_OPTIONS;
     let e_opts = options & EXEC_OPTIONS;
@@ -560,11 +560,11 @@ fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
                                         offset: uint,
                                         options: int)
                                         -> replace_result {
-    let offset = offset;
-    let subject_len = str::len_chars(subject);
+    let mut offset = offset;
+    let subject_len = str::char_len(subject);
     assert offset <= subject_len;
 
-    let s = "";
+    let mut s = "";
     while true {
         let r = match_from(pattern, subject, offset, options);
         alt r {
@@ -588,16 +588,18 @@ fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
     ret ok(s);
 }
 
-fn char_offset_from_byte_offset(s: str, byte_offset: uint) -> uint {
+fn char_offset_from_byte_offset(s: str, byte_offset: uint) -> uint unsafe {
     if byte_offset == 0u { ret 0u; }
-    let subs = str::as_buf(s) {|b| str::from_cstr_len(b, byte_offset) };
-    ret str::len_chars(subs);
+    let subs = str::as_buf(s) {|b|
+      str::unsafe::from_c_str_len(b as *c_char, byte_offset)
+    };
+    ret str::char_len(subs);
 }
 
 fn byte_offset_from_char_offset(s: str, char_offset: uint) -> uint {
     if char_offset == 0u { ret 0u; }
     let subs = str::slice(s, 0u, char_offset);
-    ret str::len_bytes(subs);
+    ret str::len(subs);
 }
 
 fn fmt_compile_err(e: compile_err) -> str {
