@@ -177,8 +177,11 @@ mod const {
 
 enum pcre {}
 enum pcre_extra {}
-resource pcre_res(p: *pcre) {
-    c::free(p as *c_void);
+class pcre_res {
+    let p: *pcre;
+    new(p: *pcre) { self.p = p; }
+    // FIXME
+    // drop { c::free(self.p as c_void); }
 }
 
 #[doc = "
@@ -260,7 +263,7 @@ native mod pcre {
 impl pattern_util for pattern {
     fn info_capture_count() -> uint {
         let count = -1 as c_int;
-        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
+        pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
                             PCRE_INFO_CAPTURECOUNT as c_int,
                             ptr::addr_of(count) as *c_void);
         assert count >= 0 as c_int;
@@ -269,7 +272,7 @@ impl pattern_util for pattern {
 
     fn info_name_count() -> uint {
         let count = -1 as c_int;
-        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
+        pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
                             PCRE_INFO_NAMECOUNT as c_int,
                             ptr::addr_of(count) as *c_void);
         assert count >= 0 as c_int;
@@ -278,7 +281,7 @@ impl pattern_util for pattern {
 
     fn info_name_entry_size() -> uint {
         let size = -1 as c_int;
-        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
+        pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
                             PCRE_INFO_NAMEENTRYSIZE as c_int,
                             ptr::addr_of(size) as *c_void);
         assert size >= 0 as c_int;
@@ -287,7 +290,7 @@ impl pattern_util for pattern {
 
     fn with_name_table(blk: fn(*u8)) unsafe {
         let table = ptr::null::<u8>();
-        pcre::pcre_fullinfo(**(self._pcre_res), ptr::null(),
+        pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
                             PCRE_INFO_NAMETABLE as c_int,
                             ptr::addr_of(table) as *c_void);
         assert table != ptr::null::<u8>();
@@ -304,7 +307,7 @@ impl pattern_util for pattern {
         let size = self.info_name_entry_size();
         let mut names: [str] = [];
         self.with_name_table {|table|
-            uint::range(0u, count) {|i|
+            for uint::range(0u, count) {|i|
                 let p = ptr::offset(table, size * i + 2u);
                 let s = str::unsafe::from_c_str(p as *c_char);
                 vec::push(names, s);
@@ -363,7 +366,7 @@ impl match_util for match {
 
     fn named_group(name: str) -> option<str> {
         let i = str::as_buf(name) {|s|
-            pcre::pcre_get_stringnumber(**self.pattern._pcre_res, s as *c_char)
+            pcre::pcre_get_stringnumber(self.pattern._pcre_res.p, s as *c_char)
         };
         if i <= 0 as c_int { ret none; }
         ret self.group(i as uint);
@@ -377,7 +380,7 @@ impl match_util for match {
     }
 
     fn subgroups_iter(blk: fn(str)) {
-        uint::range(1u, self.group_count() + 1u) {|i|
+        for uint::range(1u, self.group_count() + 1u) {|i|
             alt self.group(i) {
               some(s) { blk(s); }
               none { fail; }
@@ -433,7 +436,7 @@ fn exec(pattern: pattern,
     let mut ovec = vec::from_elem((count as uint) * 3u, 0u as c_int);
 
     let ret_code = str::as_buf(subject) {|s|
-        pcre::pcre_exec(**(pattern._pcre_res), ptr::null(),
+        pcre::pcre_exec(pattern._pcre_res.p, ptr::null(),
                         s as *c_char, str::len(subject) as c_int,
                         offset as c_int, options as c_int,
                         vec::unsafe::to_ptr(ovec) as *c_int,
@@ -447,7 +450,7 @@ fn exec(pattern: pattern,
 
     let mut captures: [uint] = [];
     vec::reserve(captures, vec::len(ovec));
-    for o in ovec {
+    for ovec.each {|o|
         if o as int < 0 { cont; }
         vec::push(captures, o as uint);
     }
@@ -549,7 +552,7 @@ fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
     assert offset <= subject_len;
 
     let mut s = "";
-    while true {
+    loop {
         let r = match_from(pattern, subject, offset, options);
         alt r {
           ok(m) {
@@ -557,7 +560,7 @@ fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
             s += repl_fn(m);
             offset = m.end();
           }
-          err(match_err(PCRE_ERROR_NOMATCH)) {
+          err(match_err(e)) if e == PCRE_ERROR_NOMATCH {
             let rest_len = subject_len - offset;
             if rest_len > 0u {
                 s += str::slice(subject, offset, rest_len);
@@ -581,7 +584,7 @@ Returns true iff mr indicates that the subject did not match the pattern.
 "]
 pure fn is_nomatch(mr: match_result) -> bool {
     ret alt mr {
-      err(match_err(PCRE_ERROR_NOMATCH)) { true }
+      err(match_err(e)) if e == PCRE_ERROR_NOMATCH { true }
       _ { false }
     };
 }
@@ -612,9 +615,6 @@ mod test_util {
     }
 
     impl result_util<T, U> for result<T, U> {
-        fn is_ok() -> bool { result::success(self) }
-        fn is_err() -> bool { result::failure(self) }
-
         fn is_ok_and(blk: fn(T) -> bool) -> bool {
             ret alt self {
               ok(t) { blk(t) }
@@ -692,7 +692,7 @@ mod test {
             assert e.code == 14;
             assert e.reason == "missing )";
             assert e.offset == 4u;
-            ret true;
+            true
         }
     }
 
@@ -801,7 +801,7 @@ mod test_match_util {
             assert m.group(1u).is_some_and {|s| s == "foo" };
             assert m.group(2u).is_some_and {|s| s == "baz" };
             assert m.group(3u).is_none();
-            ret true;
+            true
         }
     }
 
@@ -845,7 +845,7 @@ mod test_match_util {
         assert r.is_ok_and {|m|
             assert m.named_group("foo_name").is_some_and {|s| s == "foo" };
             assert m.named_group("nonexistent").is_none();
-            ret true;
+            true
         }
     }
 }
