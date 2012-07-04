@@ -242,12 +242,12 @@ type match = {
 
 #[nolink]
 #[abi = "cdecl"]
-native mod c {
+extern mod c {
     fn free(p: *c_void);
 }
 
 #[abi = "cdecl"]
-native mod pcre {
+extern mod pcre {
     fn pcre_compile2(pattern: *c_char, options: c_int,
                      errorcodeptr: *c_int,
                      errptr: **c_char, erroffset: *c_int,
@@ -306,8 +306,8 @@ impl pattern_util for pattern {
         if count == 0u { ret []; }
         let size = self.info_name_entry_size();
         let mut names: [str] = [];
-        self.with_name_table {|table|
-            for uint::range(0u, count) {|i|
+        do self.with_name_table |table| {
+            for uint::range(0u, count) |i| {
                 let p = ptr::offset(table, size * i + 2u);
                 let s = str::unsafe::from_c_str(p as *c_char);
                 vec::push(names, s);
@@ -365,9 +365,9 @@ impl match_util for match {
     }
 
     fn named_group(name: str) -> option<str> {
-        let i = str::as_buf(name) {|s|
+        let i = str::as_buf(name, |s| {
             pcre::pcre_get_stringnumber(self.pattern._pcre_res.p, s as *c_char)
-        };
+        });
         if i <= 0 as c_int { ret none; }
         ret self.group(i as uint);
     }
@@ -375,12 +375,12 @@ impl match_util for match {
     fn subgroups() -> [str] {
         let mut v = [];
         vec::reserve(v, self.group_count());
-        self.subgroups_iter {|elt| vec::push(v, elt); }
+        do self.subgroups_iter |elt| { vec::push(v, elt); }
         ret v;
     }
 
     fn subgroups_iter(blk: fn(str)) {
-        for uint::range(1u, self.group_count() + 1u) {|i|
+        for uint::range(1u, self.group_count() + 1u) |i| {
             alt self.group(i) {
               some(s) { blk(s); }
               none { fail; }
@@ -406,14 +406,14 @@ fn compile(pattern: str, options: int) -> compile_result unsafe {
     let errcode = 0 as c_int;
     let errreason: *c_char = ptr::null();
     let erroffset = 0 as c_int;
-    let p = str::as_buf(pattern) {|pat|
+    let p = str::as_buf(pattern, |pat| {
         pcre::pcre_compile2(pat as *c_char,
                             options as c_int,
                             ptr::addr_of(errcode),
                             ptr::addr_of(errreason),
                             ptr::addr_of(erroffset),
                             ptr::null())
-    };
+    });
     if p == ptr::null() {
         ret err({code: errcode as int,
                  reason: str::unsafe::from_c_str(errreason),
@@ -435,13 +435,13 @@ fn exec(pattern: pattern,
     let count = (pattern.info_capture_count() + 1u) as c_int;
     let mut ovec = vec::from_elem((count as uint) * 3u, 0u as c_int);
 
-    let ret_code = str::as_buf(subject) {|s|
+    let ret_code = str::as_buf(subject, |s| {
         pcre::pcre_exec(pattern._pcre_res.p, ptr::null(),
                         s as *c_char, str::len(subject) as c_int,
                         offset as c_int, options as c_int,
                         vec::unsafe::to_ptr(ovec) as *c_int,
                         count * (3 as c_int)) as int
-    };
+    });
 
     if ret_code < 0 { ret err(ret_code as match_err); }
 
@@ -450,7 +450,7 @@ fn exec(pattern: pattern,
 
     let mut captures: [uint] = [];
     vec::reserve(captures, vec::len(ovec));
-    for ovec.each {|o|
+    for ovec.each |o| {
         if o as int < 0 { cont; }
         vec::push(captures, o as uint);
     }
@@ -635,22 +635,22 @@ mod test_util {
         let s = some(42);
 
         assert  s.is_some();
-        assert  s.is_some_and {|i| i == 42 };
-        assert !s.is_some_and {|i| i != 42 };
+        assert  s.is_some_and(|i| {i == 42 });
+        assert !s.is_some_and(|i| {i != 42 });
 
         assert !s.is_none();
-        assert !s.is_none_and {|| true };
-        assert !s.is_none_and {|| false };
+        assert !s.is_none_and(|| { true });
+        assert !s.is_none_and(|| { false });
 
         let n = none::<()>;
 
         assert  n.is_none();
-        assert  n.is_none_and {|| true };
-        assert !n.is_none_and {|| false };
+        assert  n.is_none_and(||{ true });
+        assert !n.is_none_and(||{ false });
 
         assert !n.is_some();
-        assert !n.is_some_and {|_nil| true };
-        assert !n.is_some_and {|_nil| false };
+        assert !n.is_some_and(|_nil| { true });
+        assert !n.is_some_and(|_nil| { false });
 
     }
 
@@ -659,22 +659,22 @@ mod test_util {
         let o: result<int, ()> = ok(42);
 
         assert  o.is_ok();
-        assert  o.is_ok_and {|i| i == 42 };
-        assert !o.is_ok_and {|i| i != 42 };
+        assert  o.is_ok_and(|i| { i == 42 });
+        assert !o.is_ok_and(|i| { i != 42 });
 
         assert !o.is_err();
-        assert !o.is_err_and {|_nil| true };
-        assert !o.is_err_and {|_nil| false };
+        assert !o.is_err_and(|_nil| { true });
+        assert !o.is_err_and(|_nil| { false });
 
         let e: result<(), int> = err(42);
 
         assert  e.is_err();
-        assert  e.is_err_and {|i| i == 42 };
-        assert !e.is_err_and {|i| i != 42 };
+        assert  e.is_err_and(|i| { i == 42 });
+        assert !e.is_err_and(|i| { i != 42 });
 
         assert !e.is_ok();
-        assert !e.is_ok_and {|_nil| true };
-        assert !e.is_ok_and {|_nil| false };
+        assert !e.is_ok_and(|_nil| { true });
+        assert !e.is_ok_and(|_nil| { false });
     }
 }
 
@@ -688,12 +688,12 @@ mod test {
         assert r.is_ok();
 
         let r = compile("foo(", 0);
-        assert r.is_err_and {|e|
+        assert r.is_err_and(|e| {
             assert e.code == 14;
             assert e.reason == "missing )";
             assert e.offset == 4u;
             true
-        }
+        })
     }
 
     #[test]
@@ -758,33 +758,33 @@ mod test {
     #[test]
     fn test_replace() {
         let r = replace("bcd", "AbcdE", "BCD", 0);
-        assert r.is_ok_and {|s| s == "ABCDE" };
+        assert do r.is_ok_and |s| { s == "ABCDE" };
     }
 
     #[test]
     fn test_replace_from() {
         let r = replace_from("bcd", "AbcdbcdE", "BCD", 2u, 0);
-        assert r.is_ok_and {|s| s == "AbcdBCDE" };
+        assert do r.is_ok_and |s| { s == "AbcdBCDE" };
     }
 
     #[test]
     fn test_replace_fn() {
         let r = replace_fn("bcd", "AbcdE",
-                           {|m| str::to_upper(m.matched()) }, 0);
-        assert r.is_ok_and {|s| s == "ABCDE" };
+                           |m| { str::to_upper(m.matched()) }, 0);
+        assert do r.is_ok_and |s| { s == "ABCDE" };
     }
 
     #[test]
     fn test_replace_fn_from() {
         let r = replace_fn_from("bcd", "AbcdbcdE",
-                                {|m| str::to_upper(m.matched()) }, 2u, 0);
-        assert r.is_ok_and {|s| s == "AbcdBCDE" };
+                                |m| { str::to_upper(m.matched()) }, 2u, 0);
+        assert do r.is_ok_and |s| { s == "AbcdBCDE" };
     }
 
     #[test]
     fn test_replace_all() {
         let r = replace_all("XX", "XXfooXXbarXXbazXX", "_", 0);
-        assert r.is_ok_and {|s| s == "_foo_bar_baz_" };
+        assert do r.is_ok_and |s| { s == "_foo_bar_baz_" };
     }
 }
 
@@ -796,10 +796,10 @@ mod test_match_util {
     #[test]
     fn test_group() {
         let r = match("(foo)bar(baz)", "foobarbaz", 0);
-        assert r.is_ok_and {|m|
-            assert m.group(0u).is_some_and {|s| s == "foobarbaz" };
-            assert m.group(1u).is_some_and {|s| s == "foo" };
-            assert m.group(2u).is_some_and {|s| s == "baz" };
+        assert do r.is_ok_and |m| {
+            assert do m.group(0u).is_some_and |s| { s == "foobarbaz" };
+            assert do m.group(1u).is_some_and |s| { s == "foo" };
+            assert do m.group(2u).is_some_and |s| { s == "baz" };
             assert m.group(3u).is_none();
             true
         }
@@ -808,42 +808,42 @@ mod test_match_util {
     #[test]
     fn test_subgroups() {
         let r = match("(foo)bar(baz)", "foobarbaz", 0);
-        assert r.is_ok_and {|m|
-            vec::all2(m.subgroups(), ["foo", "baz"]) {|s, t| s == t }
+        assert do r.is_ok_and |m| {
+            do vec::all2(m.subgroups(), ["foo", "baz"]) |s, t| { s == t }
         }
     }
 
     #[test]
     fn test_group_count() {
         let r = match("foobarbaz", "foobarbaz", 0);
-        assert r.is_ok_and {|m| m.group_count() == 0u };
+        assert do r.is_ok_and |m| { m.group_count() == 0u };
 
         let r = match("(foo)bar(baz)", "foobarbaz", 0);
-        assert r.is_ok_and {|m| m.group_count() == 2u };
+        assert do r.is_ok_and |m| { m.group_count() == 2u };
 
         let r = match("(?:foo)bar", "foobar", 0);
-        assert r.is_ok_and {|m| m.group_count() == 0u };
+        assert do r.is_ok_and |m| { m.group_count() == 0u };
 
         let r = match("(?:(foo)|baz)bar", "foobar", 0);
-        assert r.is_ok_and {|m| m.group_count() == 1u };
+        assert do r.is_ok_and |m| { m.group_count() == 1u };
 
         let r = match("(?:foo|(baz))bar", "foobar", 0);
-        assert r.is_ok_and {|m| m.group_count() == 0u };
+        assert do r.is_ok_and |m| { m.group_count() == 0u };
     }
 
     #[test]
     fn test_group_names() {
         let r = match("(?<foo_name>foo)bar", "foobar", 0);
-        assert r.is_ok_and {|m|
-            vec::all2(m.group_names(), ["foo_name"]) {|s, t| s == t }
+        assert do r.is_ok_and |m| {
+            do vec::all2(m.group_names(), ["foo_name"]) |s, t| { s == t }
         }
     }
 
     #[test]
     fn test_named_group() {
         let r = match("(?<foo_name>f..)bar", "foobar", 0);
-        assert r.is_ok_and {|m|
-            assert m.named_group("foo_name").is_some_and {|s| s == "foo" };
+        assert do r.is_ok_and |m| {
+            assert do m.named_group("foo_name").is_some_and |s| { s == "foo" };
             assert m.named_group("nonexistent").is_none();
             true
         }
