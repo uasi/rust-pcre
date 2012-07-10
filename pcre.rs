@@ -748,34 +748,34 @@ mod test {
 
     #[test]
     fn test_replace() {
-        let r = replace("bcd", "AbcdE", "BCD", 0);
-        assert r.is_ok_and(|s| s == "ABCDE");
+        let r = replace("bcd", "AbcdbcdbcdE", "BCD", 0);
+        assert r.is_ok_and(|s| s == "ABCDbcdbcdE");
     }
 
     #[test]
     fn test_replace_from() {
-        let r = replace_from("bcd", "AbcdbcdE", "BCD", 2u, 0);
-        assert r.is_ok_and(|s| s == "AbcdBCDE");
+        let r = replace_from("bcd", "AbcdbcdbcdE", "BCD", 2u, 0);
+        assert r.is_ok_and(|s| s == "AbcdBCDbcdE");
     }
 
     #[test]
     fn test_replace_fn() {
-        let r = replace_fn("bcd", "AbcdE",
+        let r = replace_fn("bcd", "AbcdbcdbcdE",
                            |m| { str::to_upper(m.matched()) }, 0);
-        assert r.is_ok_and(|s| s == "ABCDE");
+        assert r.is_ok_and(|s| s == "ABCDbcdbcdE");
     }
 
     #[test]
     fn test_replace_fn_from() {
-        let r = replace_fn_from("bcd", "AbcdbcdE",
+        let r = replace_fn_from("bcd", "AbcdbcdbcdE",
                                 |m| { str::to_upper(m.matched()) }, 2u, 0);
-        assert r.is_ok_and(|s| s == "AbcdBCDE");
+        assert r.is_ok_and(|s| s == "AbcdBCDbcdE");
     }
 
     #[test]
     fn test_replace_all() {
-        let r = replace_all("XX", "XXfooXXbarXXbazXX", "_", 0);
-        assert r.is_ok_and(|s| s == "_foo_bar_baz_");
+        let r = replace_all("bcd", "AbcdbcdbcdE", "BCD", 0);
+        assert r.is_ok_and(|s| s == "ABCDBCDBCDE");
     }
 }
 
