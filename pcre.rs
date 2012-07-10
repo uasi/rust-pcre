@@ -235,9 +235,6 @@ type match = {
     subject: str,
     pattern: pattern,
     _captures: ~[uint],
-    // FIXME: we may cache these values for reuse
-    // mutable _subgroups: option<[str]>,
-    // mutable _names: option<std::map<str, uint>>,
 };
 
 #[nolink]
