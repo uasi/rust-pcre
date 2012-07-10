@@ -180,8 +180,7 @@ enum pcre_extra {}
 class pcre_res {
     let p: *pcre;
     new(p: *pcre) { self.p = p; }
-    // FIXME
-    // drop { c::free(self.p as c_void); }
+    drop { c::free(self.p as *c_void); }
 }
 
 #[doc = "
