@@ -441,7 +441,7 @@ fn exec(pattern: pattern,
 
     if ret_code < 0 { ret err(ret_code as match_err); }
 
-    // cut off the working space
+    // Cut off the working space
     vec::unsafe::set_len(ovec, count as uint * 2u);
 
     let mut captures: ~[uint] = ~[];
@@ -712,9 +712,7 @@ mod test {
         assert is_nomatch(r);
 
         let r = match("はにほ", "いろはにほへと", 0);
-        assert r.is_ok();
-        assert result::get(r).begin() == 6u;
-        assert result::get(r).end() == 15u;
+        assert r.is_ok_and(|m| m.begin() == 6u && m.end() == 15u);
 
         let r = match("ちりぬ", "いろはにほへと", 0);
         assert is_nomatch(r);
