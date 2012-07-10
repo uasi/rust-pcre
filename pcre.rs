@@ -592,9 +592,6 @@ mod test_util {
     export result_util;
 
     impl option_util<T> for option<T> {
-        fn is_some() -> bool { option::is_some(self) }
-        fn is_none() -> bool { option::is_none(self) }
-
         fn is_some_and(blk: fn(T) -> bool) -> bool {
             ret alt self {
               some(t) { blk(t) }
