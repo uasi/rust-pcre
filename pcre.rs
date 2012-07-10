@@ -234,7 +234,7 @@ type pattern = {
 type match = {
     subject: str,
     pattern: pattern,
-    _captures: [uint],
+    _captures: ~[uint],
     // FIXME: we may cache these values for reuse
     // mutable _subgroups: option<[str]>,
     // mutable _names: option<std::map<str, uint>>,
@@ -301,11 +301,11 @@ impl pattern_util for pattern {
         ret self.info_capture_count();
     }
 
-    fn group_names() -> [str] unsafe {
+    fn group_names() -> ~[str] unsafe {
         let count = self.info_name_count();
-        if count == 0u { ret []; }
+        if count == 0u { ret ~[]; }
         let size = self.info_name_entry_size();
-        let mut names: [str] = [];
+        let mut names: ~[str] = ~[];
         do self.with_name_table |table| {
             for uint::range(0u, count) |i| {
                 let p = ptr::offset(table, size * i + 2u);
@@ -372,8 +372,8 @@ impl match_util for match {
         ret self.group(i as uint);
     }
 
-    fn subgroups() -> [str] {
-        let mut v = [];
+    fn subgroups() -> ~[str] {
+        let mut v = ~[];
         vec::reserve(v, self.group_count());
         do self.subgroups_iter |elt| { vec::push(v, elt); }
         ret v;
@@ -392,7 +392,7 @@ impl match_util for match {
         ret vec::len(self._captures) / 2u - 1u;
     }
 
-    fn group_names() -> [str] {
+    fn group_names() -> ~[str] {
         ret self.pattern.group_names();
     }
 }
@@ -448,7 +448,7 @@ fn exec(pattern: pattern,
     // cut off the working space
     vec::unsafe::set_len(ovec, count as uint * 2u);
 
-    let mut captures: [uint] = [];
+    let mut captures: ~[uint] = ~[];
     vec::reserve(captures, vec::len(ovec));
     for ovec.each |o| {
         if o as int < 0 { cont; }
@@ -809,7 +809,7 @@ mod test_match_util {
     fn test_subgroups() {
         let r = match("(foo)bar(baz)", "foobarbaz", 0);
         assert do r.is_ok_and |m| {
-            do vec::all2(m.subgroups(), ["foo", "baz"]) |s, t| { s == t }
+            do vec::all2(m.subgroups(), ~["foo", "baz"]) |s, t| { s == t }
         }
     }
 
@@ -835,7 +835,7 @@ mod test_match_util {
     fn test_group_names() {
         let r = match("(?<foo_name>foo)bar", "foobar", 0);
         assert do r.is_ok_and |m| {
-            do vec::all2(m.group_names(), ["foo_name"]) |s, t| { s == t }
+            do vec::all2(m.group_names(), ~["foo_name"]) |s, t| { s == t }
         }
     }
 
