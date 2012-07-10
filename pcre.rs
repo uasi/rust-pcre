@@ -632,22 +632,22 @@ mod test_util {
         let s = some(42);
 
         assert  s.is_some();
-        assert  s.is_some_and(|i| {i == 42 });
-        assert !s.is_some_and(|i| {i != 42 });
+        assert  s.is_some_and(|i| i == 42);
+        assert !s.is_some_and(|i| i != 42);
 
         assert !s.is_none();
-        assert !s.is_none_and(|| { true });
-        assert !s.is_none_and(|| { false });
+        assert !s.is_none_and(|| true);
+        assert !s.is_none_and(|| false);
 
         let n = none::<()>;
 
         assert  n.is_none();
-        assert  n.is_none_and(||{ true });
-        assert !n.is_none_and(||{ false });
+        assert  n.is_none_and(|| true);
+        assert !n.is_none_and(|| false);
 
         assert !n.is_some();
-        assert !n.is_some_and(|_nil| { true });
-        assert !n.is_some_and(|_nil| { false });
+        assert !n.is_some_and(|_nil| true);
+        assert !n.is_some_and(|_nil| false);
 
     }
 
@@ -656,22 +656,22 @@ mod test_util {
         let o: result<int, ()> = ok(42);
 
         assert  o.is_ok();
-        assert  o.is_ok_and(|i| { i == 42 });
-        assert !o.is_ok_and(|i| { i != 42 });
+        assert  o.is_ok_and(|i| i == 42);
+        assert !o.is_ok_and(|i| i != 42);
 
         assert !o.is_err();
-        assert !o.is_err_and(|_nil| { true });
-        assert !o.is_err_and(|_nil| { false });
+        assert !o.is_err_and(|_nil| true);
+        assert !o.is_err_and(|_nil| false);
 
         let e: result<(), int> = err(42);
 
         assert  e.is_err();
-        assert  e.is_err_and(|i| { i == 42 });
-        assert !e.is_err_and(|i| { i != 42 });
+        assert  e.is_err_and(|i| i == 42);
+        assert !e.is_err_and(|i| i != 42);
 
         assert !e.is_ok();
-        assert !e.is_ok_and(|_nil| { true });
-        assert !e.is_ok_and(|_nil| { false });
+        assert !e.is_ok_and(|_nil| true);
+        assert !e.is_ok_and(|_nil| false);
     }
 }
 
@@ -685,12 +685,12 @@ mod test {
         assert r.is_ok();
 
         let r = compile("foo(", 0);
-        assert r.is_err_and(|e| {
+        assert do r.is_err_and |e| {
             assert e.code == 14;
             assert *e.reason == "missing )";
             assert e.offset == 4u;
             true
-        })
+        }
     }
 
     #[test]
@@ -755,33 +755,33 @@ mod test {
     #[test]
     fn test_replace() {
         let r = replace("bcd", "AbcdE", "BCD", 0);
-        assert do r.is_ok_and |s| { s == "ABCDE" };
+        assert r.is_ok_and(|s| s == "ABCDE");
     }
 
     #[test]
     fn test_replace_from() {
         let r = replace_from("bcd", "AbcdbcdE", "BCD", 2u, 0);
-        assert do r.is_ok_and |s| { s == "AbcdBCDE" };
+        assert r.is_ok_and(|s| s == "AbcdBCDE");
     }
 
     #[test]
     fn test_replace_fn() {
         let r = replace_fn("bcd", "AbcdE",
                            |m| { str::to_upper(m.matched()) }, 0);
-        assert do r.is_ok_and |s| { s == "ABCDE" };
+        assert r.is_ok_and(|s| s == "ABCDE");
     }
 
     #[test]
     fn test_replace_fn_from() {
         let r = replace_fn_from("bcd", "AbcdbcdE",
                                 |m| { str::to_upper(m.matched()) }, 2u, 0);
-        assert do r.is_ok_and |s| { s == "AbcdBCDE" };
+        assert r.is_ok_and(|s| s == "AbcdBCDE");
     }
 
     #[test]
     fn test_replace_all() {
         let r = replace_all("XX", "XXfooXXbarXXbazXX", "_", 0);
-        assert do r.is_ok_and |s| { s == "_foo_bar_baz_" };
+        assert r.is_ok_and(|s| s == "_foo_bar_baz_");
     }
 }
 
@@ -794,9 +794,9 @@ mod test_match_util {
     fn test_group() {
         let r = match("(foo)bar(baz)", "foobarbaz", 0);
         assert do r.is_ok_and |m| {
-            assert do m.group(0u).is_some_and |s| { s == "foobarbaz" };
-            assert do m.group(1u).is_some_and |s| { s == "foo" };
-            assert do m.group(2u).is_some_and |s| { s == "baz" };
+            assert m.group(0u).is_some_and(|s| s == "foobarbaz");
+            assert m.group(1u).is_some_and(|s| s == "foo");
+            assert m.group(2u).is_some_and(|s| s == "baz");
             assert m.group(3u).is_none();
             true
         }
@@ -813,19 +813,19 @@ mod test_match_util {
     #[test]
     fn test_group_count() {
         let r = match("foobarbaz", "foobarbaz", 0);
-        assert do r.is_ok_and |m| { m.group_count() == 0u };
+        assert r.is_ok_and(|m| m.group_count() == 0u);
 
         let r = match("(foo)bar(baz)", "foobarbaz", 0);
-        assert do r.is_ok_and |m| { m.group_count() == 2u };
+        assert r.is_ok_and(|m| m.group_count() == 2u);
 
         let r = match("(?:foo)bar", "foobar", 0);
-        assert do r.is_ok_and |m| { m.group_count() == 0u };
+        assert r.is_ok_and(|m| m.group_count() == 0u);
 
         let r = match("(?:(foo)|baz)bar", "foobar", 0);
-        assert do r.is_ok_and |m| { m.group_count() == 1u };
+        assert r.is_ok_and(|m| m.group_count() == 1u);
 
         let r = match("(?:foo|(baz))bar", "foobar", 0);
-        assert do r.is_ok_and |m| { m.group_count() == 0u };
+        assert r.is_ok_and(|m| m.group_count() == 0u);
     }
 
     #[test]
@@ -840,7 +840,7 @@ mod test_match_util {
     fn test_named_group() {
         let r = match("(?<foo_name>f..)bar", "foobar", 0);
         assert do r.is_ok_and |m| {
-            assert do m.named_group("foo_name").is_some_and |s| { s == "foo" };
+            assert m.named_group("foo_name").is_some_and(|s| s == "foo");
             assert m.named_group("nonexistent").is_none();
             true
         }
