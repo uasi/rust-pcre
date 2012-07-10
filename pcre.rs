@@ -209,7 +209,7 @@ The type that represents compile error.
 "]
 type compile_err = {
     code: int,
-    reason: str,
+    reason: @str,
     offset: uint,
 };
 
@@ -227,14 +227,14 @@ enum either_err {
 }
 
 type pattern = {
-    str: str,
+    str: @str,
     _pcre_res: @pcre_res,
 };
 
 type match = {
-    subject: str,
+    subject: @str,
     pattern: pattern,
-    _captures: ~[uint],
+    _captures: @~[uint],
 };
 
 #[nolink]
@@ -332,16 +332,16 @@ impl of pattern_like for compile_result {
 
 impl match_util for match {
     fn matched() -> str {
-        ret str::slice(self.subject, self.begin(), self.end());
+        ret str::slice(*self.subject, self.begin(), self.end());
     }
 
     fn prematch() -> str {
-        ret str::slice(self.subject, 0u, self.begin());
+        ret str::slice(*self.subject, 0u, self.begin());
     }
 
     fn postmatch() -> str {
-        ret str::slice(self.subject ,self.end(),
-                       str::char_len(self.subject));
+        ret str::slice(*self.subject ,self.end(),
+                       str::char_len(*self.subject));
     }
 
     fn begin() -> uint {
@@ -356,7 +356,7 @@ impl match_util for match {
         if i > self.group_count() {
             ret none;
         }
-        ret some(str::slice(self.subject,
+        ret some(str::slice(*self.subject,
                             self._captures[i * 2u],
                             self._captures[i * 2u + 1u]));
     }
@@ -372,7 +372,7 @@ impl match_util for match {
     fn subgroups() -> ~[str] {
         let mut v = ~[];
         vec::reserve(v, self.group_count());
-        do self.subgroups_iter |elt| { vec::push(v, elt); }
+        do self.subgroups_iter |elt| { vec::push(v, copy elt); }
         ret v;
     }
 
@@ -386,7 +386,7 @@ impl match_util for match {
     }
 
     fn group_count() -> uint {
-        ret vec::len(self._captures) / 2u - 1u;
+        ret vec::len(*self._captures) / 2u - 1u;
     }
 
     fn group_names() -> ~[str] {
@@ -413,10 +413,10 @@ fn compile(pattern: str, options: int) -> compile_result unsafe {
     });
     if p == ptr::null() {
         ret err({code: errcode as int,
-                 reason: str::unsafe::from_c_str(errreason),
+                 reason: @str::unsafe::from_c_str(errreason),
                  offset: erroffset as uint});
     }
-    ret ok({str: pattern, _pcre_res: @pcre_res(p)});
+    ret ok({str: @copy pattern, _pcre_res: @pcre_res(p)});
 }
 
 fn exec(pattern: pattern,
@@ -453,7 +453,7 @@ fn exec(pattern: pattern,
     }
     assert vec::len(captures) % 2u == 0u;
 
-    ret ok({subject: subject, pattern: pattern, _captures: captures});
+    ret ok({subject: @copy subject, pattern: pattern, _captures: @captures});
 }
 
 fn match<T: pattern_like>(pattern: T, subject: str,
@@ -489,13 +489,13 @@ fn match_from<T: pattern_like>(pattern: T, subject: str,
 
 fn replace<T: pattern_like>(pattern: T, subject: str, repl: str,
                             options: int) -> replace_result {
-    ret replace_fn_from(pattern, subject, {|_m| repl }, 0u, options);
+    ret replace_fn_from(pattern, subject, |_m| { copy repl }, 0u, options);
 }
 
 fn replace_from<T: pattern_like>(pattern: T, subject: str, repl: str,
                                  offset: uint, options: int)
                                  -> replace_result {
-    ret replace_fn_from(pattern, subject, {|_m| repl }, offset, options);
+    ret replace_fn_from(pattern, subject, |_m| { copy repl }, offset, options);
 }
 
 fn replace_fn<T: pattern_like>(pattern: T, subject: str,
@@ -521,7 +521,7 @@ fn replace_all<T: pattern_like>(pattern: T, subject: str,
                                 repl: str,
                                 options: int)
                                 -> replace_result {
-    ret replace_all_fn_from(pattern, subject, {|_m| repl }, 0u, options);
+    ret replace_all_fn_from(pattern, subject, |_m| { copy repl }, 0u, options);
 }
 
 fn replace_all_fn<T: pattern_like>(pattern: T, subject: str,
@@ -536,7 +536,7 @@ fn replace_all_from<T: pattern_like>(pattern: T, subject: str,
                                      offset: uint,
                                      options: int)
                                      -> replace_result {
-    ret replace_all_fn_from(pattern, subject, {|_m| repl }, offset, options);
+    ret replace_all_fn_from(pattern, subject, |_m| { copy repl }, offset, options);
 }
 
 fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
@@ -565,7 +565,7 @@ fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
             break;
           }
           err(e) {
-            ret err(e);
+            ret err(copy e);
           }
         }
     }
@@ -573,7 +573,7 @@ fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
 }
 
 fn fmt_compile_err(e: compile_err) -> str {
-    ret #fmt("error %d: %s at offset %u", e.code, e.reason, e.offset);
+    ret #fmt("error %d: %s at offset %u", e.code, *e.reason, e.offset);
 }
 
 #[doc = "
@@ -687,7 +687,7 @@ mod test {
         let r = compile("foo(", 0);
         assert r.is_err_and(|e| {
             assert e.code == 14;
-            assert e.reason == "missing )";
+            assert *e.reason == "missing )";
             assert e.offset == 4u;
             true
         })
@@ -706,7 +706,7 @@ mod test {
         alt r {
           err(compile_err(e)) {
             assert e.code == 14;
-            assert e.reason == "missing )";
+            assert *e.reason == "missing )";
             assert e.offset == 4u;
           }
           _ { fail; }
