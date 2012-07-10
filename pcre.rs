@@ -34,7 +34,7 @@ export pattern_like;
 export match_util;
 
 // mod
-//export const;
+//export consts;
 
 import core::libc::{c_char, c_int, c_void};
 import core::option::{some, none};
@@ -42,8 +42,8 @@ import core::result::{ok, err};
 import core::either::either;
 import core::result::result;
 
-import const::*;
-mod const {
+import consts::*;
+mod consts {
     const PCRE_CASELESS: int          = 0x00000001; // Compile
     const PCRE_MULTILINE: int         = 0x00000002; // Compile
     const PCRE_DOTALL: int            = 0x00000004; // Compile
