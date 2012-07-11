@@ -34,7 +34,7 @@ export pattern_like;
 export match_extensions;
 
 // mod
-//export consts;
+export consts;
 
 import core::libc::{c_char, c_int, c_void};
 import core::option::{some, none};
