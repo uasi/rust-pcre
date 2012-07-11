@@ -779,6 +779,12 @@ mod test {
     }
 
     #[test]
+    fn test_replace_all_from() {
+        let r = replace_all_from("bcd", "AbcdbcdbcdE", "BCD", 2u, 0);
+        assert r.is_ok_and(|s| s == "AbcdBCDBCDE");
+    }
+
+    #[test]
     fn test_replace_all_fn() {
         let r = replace_all_fn("bcd", "AbcdbcdbcdE",
                                 |m| { str::to_upper(m.matched()) }, 0);
