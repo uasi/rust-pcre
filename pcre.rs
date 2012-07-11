@@ -547,7 +547,7 @@ fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
     let subject_len = str::len(subject);
     assert offset <= subject_len;
 
-    let mut s = "";
+    let mut s = str::slice(subject, 0, offset);
     loop {
         let r = match_from(pattern, subject, offset, options);
         alt r {
@@ -557,9 +557,8 @@ fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
             offset = m.end();
           }
           err(match_err(e)) if e == PCRE_ERROR_NOMATCH {
-            let rest_len = subject_len - offset;
-            if rest_len > 0u {
-                s += str::slice(subject, offset, rest_len);
+            if offset != subject_len {
+                s += str::slice(subject, offset, subject_len);
             }
             break;
           }
