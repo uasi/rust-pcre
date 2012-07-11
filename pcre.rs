@@ -31,7 +31,7 @@ export is_nomatch;
 
 // iface
 export pattern_like;
-export match_util;
+export match_extensions;
 
 // mod
 //export consts;
@@ -329,7 +329,7 @@ impl of pattern_like for compile_result {
     fn compile(_options: int) -> compile_result { self }
 }
 
-impl match_util for match {
+impl match_extensions for match {
     fn matched() -> str {
         ret str::slice(*self.subject, self.begin(), self.end());
     }
@@ -799,7 +799,7 @@ mod test {
 }
 
 #[cfg(test)]
-mod test_match_util {
+mod test_match_extensions {
     import result::*;
     import test_util::*;
 
