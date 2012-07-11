@@ -447,7 +447,7 @@ fn exec(pattern: pattern,
     let mut captures: ~[uint] = ~[];
     vec::reserve(captures, vec::len(ovec));
     for ovec.each |o| {
-        if o as int < 0 { cont; }
+        if o as int < 0 { again; }
         vec::push(captures, o as uint);
     }
     assert vec::len(captures) % 2u == 0u;
