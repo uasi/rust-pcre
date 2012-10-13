@@ -157,7 +157,7 @@ The result type of <exec>.
 type ExecResult = Result<Match, MatchErr>;
 
 #[doc = "
-The result type of <match>.
+The result type of <search>.
 "]
 type MatchResult = Result<Match, RegexErr>;
 
@@ -453,13 +453,13 @@ fn exec(pattern: Pattern,
     return Ok({subject: @str::from_slice(subject), pattern: pattern, _captures: @captures});
 }
 
-fn matchf<T: PatternLike>(pattern: T, subject: &str,
+fn search<T: PatternLike>(pattern: T, subject: &str,
                           options: int) -> MatchResult {
-    return match_from(pattern, subject, 0u, options);
+    return search_from(pattern, subject, 0u, options);
 }
 
-fn match_from<T: PatternLike>(pattern: T, subject: &str,
-                              offset: uint, options: int) -> MatchResult {
+fn search_from<T: PatternLike>(pattern: T, subject: &str,
+                               offset: uint, options: int) -> MatchResult {
     assert offset <= str::len(subject);
 
     let c_opts = options & COMPILE_OPTIONS;
@@ -505,7 +505,7 @@ fn replace_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
                                         repl_fn: fn(Match) -> ~str, offset: uint,
                                         options: int)
                                         -> ReplaceResult {
-    let r = match_from(pattern, subject, offset, options);
+    let r = search_from(pattern, subject, offset, options);
     match r {
       Ok(m) => {
         return Ok(@(m.prematch() + repl_fn(m) + m.postmatch()));
@@ -547,7 +547,7 @@ fn replace_all_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
 
     let mut s = str::slice(subject, 0, offset);
     loop {
-        let r = match_from(pattern, subject, offset, options);
+        let r = search_from(pattern, subject, offset, options);
         match r {
           Ok(m) => {
             s += str::slice(subject, offset, m.begin());
@@ -585,12 +585,12 @@ pure fn is_nomatch(mr: MatchResult) -> bool {
 
 #[cfg(test)]
 mod test_util {
-    pub trait option_util<T> {
+    pub trait OptionUtil<T> {
         fn is_some_and(blk: fn(T) -> bool) -> bool;
         fn is_none_and(blk: fn() -> bool) -> bool;
     }
 
-    impl<T: Copy> Option<T>: option_util<T> {
+    impl<T: Copy> Option<T>: OptionUtil<T> {
         fn is_some_and(blk: fn(T) -> bool) -> bool {
             match self {
               Some(t) => blk(t),
@@ -607,12 +607,12 @@ mod test_util {
         }
     }
 
-    pub trait result_util<T, U> {
+    pub trait ResultUtil<T, U> {
         fn is_ok_and(blk: fn(T) -> bool) -> bool;
         fn is_err_and(blk: fn(U) -> bool) -> bool;
     }
 
-    impl<T: Copy, U: Copy> Result<T, U>: result_util<T, U> {
+    impl<T: Copy, U: Copy> Result<T, U>: ResultUtil<T, U> {
         fn is_ok_and(blk: fn(T) -> bool) -> bool {
             match self {
               Ok(t) => blk(t),
@@ -696,15 +696,15 @@ mod test {
     }
 
     #[test]
-    fn test_match() {
-        let r = matchf("(foo)bar", "foobar", 0);
+    fn test_search() {
+        let r = search("(foo)bar", "foobar", 0);
         assert r.is_ok();
 
         let c = compile("(foo)bar", 0);
-        let r = matchf(c, "foobar", 0);
+        let r = search(c, "foobar", 0);
         assert r.is_ok();
 
-        let r = matchf("foo(", "foobar", 0);
+        let r = search("foo(", "foobar", 0);
         match r {
           Err(CompileErr(e)) => {
             assert e.code == 14;
@@ -714,41 +714,41 @@ mod test {
           _ => { fail; }
         }
 
-        let r = matchf("(foo)bar", "baz", 0);
+        let r = search("(foo)bar", "baz", 0);
         assert is_nomatch(r);
 
-        let r = matchf("はにほ", "いろはにほへと", 0);
+        let r = search("はにほ", "いろはにほへと", 0);
         assert r.is_ok_and(|m| m.begin() == 6u && m.end() == 15u);
 
-        let r = matchf("ちりぬ", "いろはにほへと", 0);
+        let r = search("ちりぬ", "いろはにほへと", 0);
         assert is_nomatch(r);
     }
 
     // compile() accepts compile options (obviously)
     #[test]
-    fn test_match_options_0() {
-        let r = matchf(compile("foobar", PCRE_CASELESS), "FOOBAR", 0);
+    fn test_search_options_0() {
+        let r = search(compile("foobar", PCRE_CASELESS), "FOOBAR", 0);
         assert r.is_ok();
     }
 
-    // match() accepts compile options
+    // search() accepts compile options
     #[test]
-    fn test_match_options_1() {
-        let r = matchf("foobar", "FOOBAR", PCRE_CASELESS);
+    fn test_search_options_1() {
+        let r = search("foobar", "FOOBAR", PCRE_CASELESS);
         assert r.is_ok();
     }
 
-    // Inline options supersedes match-time compile options
+    // Inline options supersedes search-time compile options
     #[test]
-    fn test_match_options_2() {
-        let r = matchf("(?-i)foobar", "FOOBAR", PCRE_CASELESS);
+    fn test_search_options_2() {
+        let r = search("(?-i)foobar", "FOOBAR", PCRE_CASELESS);
         assert r.is_err();
     }
 
-    // Compile-time compile options supersedes match-time compile options
+    // Compile-time compile options supersedes search-time compile options
     #[test]
-    fn test_match_options_3() {
-        let r = matchf(compile("foobar", 0), "FOOBAR", PCRE_CASELESS);
+    fn test_search_options_3() {
+        let r = search(compile("foobar", 0), "FOOBAR", PCRE_CASELESS);
         assert r.is_err();
     }
 
@@ -811,7 +811,7 @@ mod test_match_extensions {
 
     #[test]
     fn test_group() {
-        let r = matchf("(foo)bar(baz)", "foobarbaz", 0);
+        let r = search("(foo)bar(baz)", "foobarbaz", 0);
         assert do r.is_ok_and |m| {
             assert m.group(0u).is_some_and(|s| s == @~"foobarbaz");
             assert m.group(1u).is_some_and(|s| s == @~"foo");
@@ -823,7 +823,7 @@ mod test_match_extensions {
 
     #[test]
     fn test_subgroups() {
-        let r = matchf("(foo)bar(baz)", "foobarbaz", 0);
+        let r = search("(foo)bar(baz)", "foobarbaz", 0);
         assert do r.is_ok_and |m| {
             do vec::all2(m.subgroups(), ~[~"foo", ~"baz"]) |s, t| { s == t }
         }
@@ -831,25 +831,25 @@ mod test_match_extensions {
 
     #[test]
     fn test_group_count() {
-        let r = matchf("foobarbaz", "foobarbaz", 0);
+        let r = search("foobarbaz", "foobarbaz", 0);
         assert r.is_ok_and(|m| m.group_count() == 0u);
 
-        let r = matchf("(foo)bar(baz)", "foobarbaz", 0);
+        let r = search("(foo)bar(baz)", "foobarbaz", 0);
         assert r.is_ok_and(|m| m.group_count() == 2u);
 
-        let r = matchf("(?:foo)bar", "foobar", 0);
+        let r = search("(?:foo)bar", "foobar", 0);
         assert r.is_ok_and(|m| m.group_count() == 0u);
 
-        let r = matchf("(?:(foo)|baz)bar", "foobar", 0);
+        let r = search("(?:(foo)|baz)bar", "foobar", 0);
         assert r.is_ok_and(|m| m.group_count() == 1u);
 
-        let r = matchf("(?:foo|(baz))bar", "foobar", 0);
+        let r = search("(?:foo|(baz))bar", "foobar", 0);
         assert r.is_ok_and(|m| m.group_count() == 0u);
     }
 
     #[test]
     fn test_group_names() {
-        let r = matchf("(?<foo_name>foo)bar", "foobar", 0);
+        let r = search("(?<foo_name>foo)bar", "foobar", 0);
         assert do r.is_ok_and |m| {
             do vec::all2(m.group_names(), ~[~"foo_name"]) |s, t| { s == t }
         }
@@ -857,7 +857,7 @@ mod test_match_extensions {
 
     #[test]
     fn test_named_group() {
-        let r = matchf("(?<foo_name>f..)bar", "foobar", 0);
+        let r = search("(?<foo_name>f..)bar", "foobar", 0);
         assert do r.is_ok_and |m| {
             assert m.named_group("foo_name").is_some_and(|s| s == @~"foo");
             assert m.named_group("nonexistent").is_none();
