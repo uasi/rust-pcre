@@ -139,37 +139,37 @@ mod consts {
     const PCRE_INFO_MINLENGTH: int       =  15;
 }
 
-enum pcre {}
-enum pcre_extra {}
-struct pcre_res {
-    p: *pcre,
+enum Pcre {}
+enum PcreExtra {}
+struct PcreRes {
+    p: *Pcre,
     drop { c::free(self.p as *c_void); }
 }
 
 #[doc = "
 The result type of <compile>.
 "]
-type compile_result = Result<pattern, compile_err>;
+type CompileResult = Result<Pattern, CompileErr>;
 
 #[doc = "
 The result type of <exec>.
 "]
-type exec_result = Result<Match, match_err>;
+type ExecResult = Result<Match, MatchErr>;
 
 #[doc = "
 The result type of <match>.
 "]
-type match_result = Result<Match, either_err>;
+type MatchResult = Result<Match, RegexErr>;
 
 #[doc = "
 The result type of <replace>.
 "]
-type replace_result = Result<@~str, either_err>;
+type ReplaceResult = Result<@~str, RegexErr>;
 
 #[doc = "
 The type that represents compile error.
 "]
-type compile_err = {
+type CompileErr = {
     code: int,
     reason: @~str,
     offset: uint,
@@ -178,24 +178,24 @@ type compile_err = {
 #[doc = "
 The type that represents match error.
 "]
-type match_err = int;
+type MatchErr = int;
 
 #[doc = "
 Either compile or match error.
 "]
-enum either_err {
-    compile_err(compile_err),
-    match_err(match_err),
+enum RegexErr {
+    CompileErr(CompileErr),
+    MatchErr(MatchErr),
 }
 
-type pattern = {
+type Pattern = {
     str: @~str,
-    _pcre_res: @pcre_res,
+    _pcre_res: @PcreRes,
 };
 
 type Match = {
     subject: @~str,
-    pattern: pattern,
+    pattern: Pattern,
     _captures: @~[uint],
 };
 
@@ -210,16 +210,16 @@ extern mod pcre {
     fn pcre_compile2(pattern: *c_char, options: c_int,
                      errorcodeptr: *c_int,
                      errptr: **c_char, erroffset: *c_int,
-                     tableptr: *c_char) -> *pcre;
-    fn pcre_exec(code: *pcre, extra: *pcre_extra,
+                     tableptr: *c_char) -> *Pcre;
+    fn pcre_exec(code: *Pcre, extra: *PcreExtra,
                  subject: *c_char, length: c_int, startoffset: c_int,
                  options: c_int, ovector: * c_int, ovecsize: c_int) -> c_int;
-    fn pcre_fullinfo(code: *pcre, extra: *pcre_extra,
+    fn pcre_fullinfo(code: *Pcre, extra: *PcreExtra,
                      what: c_int, where: *c_void) -> c_int;
-    fn pcre_get_stringnumber(code: *pcre, name: *c_char) -> c_int;
+    fn pcre_get_stringnumber(code: *Pcre, name: *c_char) -> c_int;
 }
 
-trait pattern_util {
+trait PatternUtil {
     fn info_capture_count() -> uint;
     fn info_name_count() -> uint;
     fn info_name_entry_size() -> uint;
@@ -228,7 +228,7 @@ trait pattern_util {
     fn group_names() -> ~[~str];
 }
 
-impl pattern: pattern_util {
+impl Pattern: PatternUtil {
     fn info_capture_count() -> uint {
         let count = -1 as c_int;
         pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
@@ -289,31 +289,31 @@ impl pattern: pattern_util {
     }
 }
 
-trait pattern_like {
-    fn compile(options: int) -> compile_result;
+trait PatternLike {
+    fn compile(options: int) -> CompileResult;
 }
 
-impl &str: pattern_like {
-    fn compile(options: int) -> compile_result { compile(self, options) }
+impl &str: PatternLike {
+    fn compile(options: int) -> CompileResult { compile(self, options) }
 }
 
-impl ~str: pattern_like {
-    fn compile(options: int) -> compile_result { compile(self, options) }
+impl ~str: PatternLike {
+    fn compile(options: int) -> CompileResult { compile(self, options) }
 }
 
-impl @str: pattern_like {
-    fn compile(options: int) -> compile_result { compile(self, options) }
+impl @str: PatternLike {
+    fn compile(options: int) -> CompileResult { compile(self, options) }
 }
 
-impl pattern: pattern_like {
-    fn compile(_options: int) -> compile_result { Ok(self) }
+impl Pattern: PatternLike {
+    fn compile(_options: int) -> CompileResult { Ok(self) }
 }
 
-impl compile_result: pattern_like {
-    fn compile(_options: int) -> compile_result { self }
+impl CompileResult: PatternLike {
+    fn compile(_options: int) -> CompileResult { self }
 }
 
-trait match_extensions {
+trait MatchExtensions {
     fn matched() -> ~str;
     fn prematch() -> ~str;
     fn postmatch() -> ~str;
@@ -327,7 +327,7 @@ trait match_extensions {
     fn group_names() -> ~[~str];
 }
 
-impl Match: match_extensions {
+impl Match: MatchExtensions {
     fn matched() -> ~str {
         return str::slice(*self.subject, self.begin(), self.end());
     }
@@ -391,7 +391,7 @@ impl Match: match_extensions {
     }
 }
 
-fn compile(pattern: &str, options: int) -> compile_result unsafe {
+fn compile(pattern: &str, options: int) -> CompileResult unsafe {
     if options | COMPILE_OPTIONS != COMPILE_OPTIONS {
         #warn("unrecognized option bit(s) are set");
     }
@@ -413,12 +413,12 @@ fn compile(pattern: &str, options: int) -> compile_result unsafe {
                     reason: @str::raw::from_c_str(errreason),
                     offset: erroffset as uint});
     }
-    return Ok({str: @str::from_slice(pattern), _pcre_res: @pcre_res {p: p}});
+    return Ok({str: @str::from_slice(pattern), _pcre_res: @PcreRes {p: p}});
 }
 
-fn exec(pattern: pattern,
+fn exec(pattern: Pattern,
         subject: &str, offset: uint,
-        options: int) -> exec_result unsafe {
+        options: int) -> ExecResult unsafe {
 
     if (options | EXEC_OPTIONS) != EXEC_OPTIONS {
         #warn("unrecognized option bit(s) are set");
@@ -437,7 +437,7 @@ fn exec(pattern: pattern,
                         count * (3 as c_int)) as int
     });
 
-    if ret_code < 0 { return Err(ret_code as match_err); }
+    if ret_code < 0 { return Err(ret_code as MatchErr); }
 
     // Cut off the working space
     vec::raw::set_len(&mut ovec, count as uint * 2u);
@@ -453,13 +453,13 @@ fn exec(pattern: pattern,
     return Ok({subject: @str::from_slice(subject), pattern: pattern, _captures: @captures});
 }
 
-fn matchf<T: pattern_like>(pattern: T, subject: &str,
-                          options: int) -> match_result {
+fn matchf<T: PatternLike>(pattern: T, subject: &str,
+                          options: int) -> MatchResult {
     return match_from(pattern, subject, 0u, options);
 }
 
-fn match_from<T: pattern_like>(pattern: T, subject: &str,
-                               offset: uint, options: int) -> match_result {
+fn match_from<T: PatternLike>(pattern: T, subject: &str,
+                              offset: uint, options: int) -> MatchResult {
     assert offset <= str::len(subject);
 
     let c_opts = options & COMPILE_OPTIONS;
@@ -474,37 +474,37 @@ fn match_from<T: pattern_like>(pattern: T, subject: &str,
             return Ok(m);
           }
           Err(m_err) => {
-            return Err(match_err(m_err));
+            return Err(MatchErr(m_err));
           }
         }
       }
       Err(c_err) => {
-          return Err(compile_err(c_err));
+          return Err(CompileErr(c_err));
       }
     }
 }
 
-fn replace<T: pattern_like Copy>(pattern: T, subject: &str, repl: &str,
-                            options: int) -> replace_result {
+fn replace<T: PatternLike Copy>(pattern: T, subject: &str, repl: &str,
+                                options: int) -> ReplaceResult {
     return replace_fn_from(pattern, subject, |_m| { str::from_slice(repl) }, 0u, options);
 }
 
-fn replace_from<T: pattern_like Copy>(pattern: T, subject: &str, repl: &str,
-                                 offset: uint, options: int)
-                                 -> replace_result {
+fn replace_from<T: PatternLike Copy>(pattern: T, subject: &str, repl: &str,
+                                     offset: uint, options: int)
+                                     -> ReplaceResult {
     return replace_fn_from(pattern, subject, |_m| { str::from_slice(repl) }, offset, options);
 }
 
-fn replace_fn<T: pattern_like Copy>(pattern: T, subject: &str,
-                               repl_fn: fn(Match) -> ~str, options: int)
-                               -> replace_result {
+fn replace_fn<T: PatternLike Copy>(pattern: T, subject: &str,
+                                   repl_fn: fn(Match) -> ~str, options: int)
+                                   -> ReplaceResult {
     return replace_fn_from(pattern, subject, repl_fn, 0u, options);
 }
 
-fn replace_fn_from<T: pattern_like Copy>(pattern: T, subject: &str,
-                                    repl_fn: fn(Match) -> ~str, offset: uint,
-                                    options: int)
-                                    -> replace_result {
+fn replace_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
+                                        repl_fn: fn(Match) -> ~str, offset: uint,
+                                        options: int)
+                                        -> ReplaceResult {
     let r = match_from(pattern, subject, offset, options);
     match r {
       Ok(m) => {
@@ -514,33 +514,33 @@ fn replace_fn_from<T: pattern_like Copy>(pattern: T, subject: &str,
     }
 }
 
-fn replace_all<T: pattern_like Copy>(pattern: T, subject: &str,
-                                repl: &str,
-                                options: int)
-                                -> replace_result {
+fn replace_all<T: PatternLike Copy>(pattern: T, subject: &str,
+                                    repl: &str,
+                                    options: int)
+                                    -> ReplaceResult {
     return replace_all_fn_from(pattern, subject, |_m| { str::from_slice(repl) }, 0u, options);
 }
 
-fn replace_all_fn<T: pattern_like Copy>(pattern: T, subject: &str,
-                                   repl_fn: fn(Match) -> ~str,
-                                   options: int)
-                                   -> replace_result {
+fn replace_all_fn<T: PatternLike Copy>(pattern: T, subject: &str,
+                                       repl_fn: fn(Match) -> ~str,
+                                       options: int)
+                                       -> ReplaceResult {
     return replace_all_fn_from(pattern, subject, repl_fn, 0u, options);
 }
 
-fn replace_all_from<T: pattern_like Copy>(pattern: T, subject: &str,
-                                     repl: &str,
-                                     offset: uint,
-                                     options: int)
-                                     -> replace_result {
+fn replace_all_from<T: PatternLike Copy>(pattern: T, subject: &str,
+                                         repl: &str,
+                                         offset: uint,
+                                         options: int)
+                                         -> ReplaceResult {
     return replace_all_fn_from(pattern, subject, |_m| { str::from_slice(repl) }, offset, options);
 }
 
-fn replace_all_fn_from<T: pattern_like Copy>(pattern: T, subject: &str,
-                                        repl_fn: fn(Match) -> ~str,
-                                        offset: uint,
-                                        options: int)
-                                        -> replace_result {
+fn replace_all_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
+                                            repl_fn: fn(Match) -> ~str,
+                                            offset: uint,
+                                            options: int)
+                                            -> ReplaceResult {
     let mut offset = offset;
     let subject_len = str::len(subject);
     assert offset <= subject_len;
@@ -554,7 +554,7 @@ fn replace_all_fn_from<T: pattern_like Copy>(pattern: T, subject: &str,
             s += repl_fn(m);
             offset = m.end();
           }
-          Err(match_err(e)) if e == PCRE_ERROR_NOMATCH => {
+          Err(MatchErr(e)) if e == PCRE_ERROR_NOMATCH => {
             if offset != subject_len {
                 s += str::slice(subject, offset, subject_len);
             }
@@ -568,7 +568,7 @@ fn replace_all_fn_from<T: pattern_like Copy>(pattern: T, subject: &str,
     return Ok(@s);
 }
 
-fn fmt_compile_err(e: compile_err) -> ~str {
+fn fmt_compile_err(e: CompileErr) -> ~str {
     return fmt!("error %d: %s at offset %u", e.code, *e.reason, e.offset);
 }
 
@@ -576,9 +576,9 @@ fn fmt_compile_err(e: compile_err) -> ~str {
 #[doc = "
 Returns true iff mr indicates that the subject did not match the pattern.
 "]
-pure fn is_nomatch(mr: match_result) -> bool {
+pure fn is_nomatch(mr: MatchResult) -> bool {
     match mr {
-      Err(match_err(e)) if e == PCRE_ERROR_NOMATCH => true,
+      Err(MatchErr(e)) if e == PCRE_ERROR_NOMATCH => true,
       _ => false,
     }
 }
@@ -706,7 +706,7 @@ mod test {
 
         let r = matchf("foo(", "foobar", 0);
         match r {
-          Err(compile_err(e)) => {
+          Err(CompileErr(e)) => {
             assert e.code == 14;
             assert e.reason == @~"missing )";
             assert e.offset == 4u;
