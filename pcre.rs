@@ -154,12 +154,12 @@ pub type CompileResult = Result<Pattern, CompileErr>;
 #[doc = "
 The result type of <exec>.
 "]
-pub type ExecResult = Result<Match, MatchErr>;
+pub type ExecResult = Result<Match, ExecErr>;
 
 #[doc = "
 The result type of <search>.
 "]
-pub type MatchResult = Result<Match, RegexErr>;
+pub type SearchResult = Result<Match, RegexErr>;
 
 #[doc = "
 The result type of <replace>.
@@ -176,16 +176,16 @@ pub type CompileErr = {
 };
 
 #[doc = "
-The type that represents match error.
+The type that represents exec error.
 "]
-pub type MatchErr = int;
+pub type ExecErr = int;
 
 #[doc = "
-Either compile or match error.
+Either compile or exec error.
 "]
 pub enum RegexErr {
     CompileErr(CompileErr),
-    MatchErr(MatchErr),
+    ExecErr(ExecErr),
 }
 
 pub type Pattern = {
@@ -437,7 +437,7 @@ pub fn exec(pattern: Pattern,
                         count * (3 as c_int)) as int
     });
 
-    if ret_code < 0 { return Err(ret_code as MatchErr); }
+    if ret_code < 0 { return Err(ret_code as ExecErr); }
 
     // Cut off the working space
     vec::raw::set_len(&mut ovec, count as uint * 2u);
@@ -454,12 +454,12 @@ pub fn exec(pattern: Pattern,
 }
 
 pub fn search<T: PatternLike>(pattern: T, subject: &str,
-                          options: int) -> MatchResult {
+                          options: int) -> SearchResult {
     return search_from(pattern, subject, 0u, options);
 }
 
 pub fn search_from<T: PatternLike>(pattern: T, subject: &str,
-                               offset: uint, options: int) -> MatchResult {
+                               offset: uint, options: int) -> SearchResult {
     assert offset <= str::len(subject);
 
     let c_opts = options & COMPILE_OPTIONS;
@@ -473,8 +473,8 @@ pub fn search_from<T: PatternLike>(pattern: T, subject: &str,
           Ok(m) => {
             return Ok(m);
           }
-          Err(m_err) => {
-            return Err(MatchErr(m_err));
+          Err(e_err) => {
+            return Err(ExecErr(e_err));
           }
         }
       }
@@ -554,7 +554,7 @@ pub fn replace_all_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
             s += repl_fn(m);
             offset = m.end();
           }
-          Err(MatchErr(e)) if e == PCRE_ERROR_NOMATCH => {
+          Err(ExecErr(e)) if e == PCRE_ERROR_NOMATCH => {
             if offset != subject_len {
                 s += str::slice(subject, offset, subject_len);
             }
@@ -574,11 +574,11 @@ pub fn fmt_compile_err(e: CompileErr) -> ~str {
 
 
 #[doc = "
-Returns true iff mr indicates that the subject did not match the pattern.
+Returns true iff sr indicates that the subject did not match the pattern.
 "]
-pure fn is_nomatch(mr: MatchResult) -> bool {
-    match mr {
-      Err(MatchErr(e)) if e == PCRE_ERROR_NOMATCH => true,
+pure fn is_nomatch(sr: SearchResult) -> bool {
+    match sr {
+      Err(ExecErr(e)) if e == PCRE_ERROR_NOMATCH => true,
       _ => false,
     }
 }
@@ -738,14 +738,14 @@ mod test {
         assert r.is_ok();
     }
 
-    // Inline options supersedes search-time compile options
+    // Inline options supersedes exec-time compile options
     #[test]
     fn test_search_options_2() {
         let r = search("(?-i)foobar", "FOOBAR", PCRE_CASELESS);
         assert r.is_err();
     }
 
-    // Compile-time compile options supersedes search-time compile options
+    // Compile-time compile options supersedes exec-time compile options
     #[test]
     fn test_search_options_3() {
         let r = search(compile("foobar", 0), "FOOBAR", PCRE_CASELESS);
