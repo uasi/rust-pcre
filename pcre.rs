@@ -700,7 +700,18 @@ mod test {
         let r = search("(foo)bar", "foobar", 0);
         assert r.is_ok();
 
+        let r = search(~"(foo)bar", "foobar", 0);
+        assert r.is_ok();
+
+        let r = search(@"(foo)bar", "foobar", 0);
+        assert r.is_ok();
+
         let c = compile("(foo)bar", 0);
+        let p = c.get();
+
+        let r = search(p, "foobar", 0);
+        assert r.is_ok();
+
         let r = search(c, "foobar", 0);
         assert r.is_ok();
 
