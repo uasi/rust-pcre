@@ -1,49 +1,13 @@
-use std;
+extern mod std;
 
-// type
-export compile_result;
-export exec_result;
-export match_result;
-export replace_result;
-export compile_err;
-export match_err;
-export pattern;
-export match;
+use core::libc::{c_char, c_int, c_void};
+use core::option::{Some, None};
+use core::result::{Ok, Err};
+use core::either::Either;
+use core::result::Result;
 
-// enum
-export either_err;
-
-// fn
-export compile;
-export exec;
-export match;
-export match_from;
-export replace;
-export replace_from;
-export replace_fn;
-export replace_fn_from;
-export replace_all;
-export replace_all_from;
-export replace_all_fn;
-export replace_all_fn_from;
-export fmt_compile_err;
-export is_nomatch;
-
-// iface
-export pattern_like;
-export match_extensions;
-
-// mod
-export consts;
-
-import core::libc::{c_char, c_int, c_void};
-import core::option::{some, none};
-import core::result::{ok, err};
-import core::either::either;
-import core::result::result;
-
-import consts::*;
-mod consts {
+use consts::*;
+pub mod consts {
     const PCRE_CASELESS: int          = 0x00000001; // Compile
     const PCRE_MULTILINE: int         = 0x00000002; // Compile
     const PCRE_DOTALL: int            = 0x00000004; // Compile
@@ -175,64 +139,63 @@ mod consts {
     const PCRE_INFO_MINLENGTH: int       =  15;
 }
 
-enum pcre {}
-enum pcre_extra {}
-class pcre_res {
-    let p: *pcre;
-    new(p: *pcre) { self.p = p; }
+enum Pcre {}
+enum PcreExtra {}
+struct PcreRes {
+    p: *Pcre,
     drop { c::free(self.p as *c_void); }
 }
 
 #[doc = "
 The result type of <compile>.
 "]
-type compile_result = result<pattern, compile_err>;
+pub type CompileResult = Result<Pattern, CompileErr>;
 
 #[doc = "
 The result type of <exec>.
 "]
-type exec_result = result<match, match_err>;
+pub type ExecResult = Result<Match, ExecErr>;
 
 #[doc = "
-The result type of <match>.
+The result type of <search>.
 "]
-type match_result = result<match, either_err>;
+pub type SearchResult = Result<Match, RegexErr>;
 
 #[doc = "
 The result type of <replace>.
 "]
-type replace_result = result<str, either_err>;
+pub type ReplaceResult = Result<@~str, RegexErr>;
 
 #[doc = "
 The type that represents compile error.
 "]
-type compile_err = {
+pub type CompileErr = {
     code: int,
-    reason: @str,
+    reason: @~str,
     offset: uint,
 };
 
 #[doc = "
-The type that represents match error.
+The type that represents exec error.
 "]
-type match_err = int;
+pub type ExecErr = int;
 
 #[doc = "
-Either compile or match error.
+Either compile or exec error.
 "]
-enum either_err {
-    compile_err(compile_err),
-    match_err(match_err),
+pub enum RegexErr {
+    CompileErr(CompileErr),
+    ExecErr(ExecErr),
 }
 
-type pattern = {
-    str: @str,
-    _pcre_res: @pcre_res,
+pub type Pattern = {
+    str: @~str,
+    _pcre_res: @PcreRes,
 };
 
-type match = {
-    subject: @str,
-    pattern: pattern,
+pub type Match = {
+    subject: @~str,
+    pattern: Pattern,
     _captures: @~[uint],
 };
 
@@ -247,153 +210,188 @@ extern mod pcre {
     fn pcre_compile2(pattern: *c_char, options: c_int,
                      errorcodeptr: *c_int,
                      errptr: **c_char, erroffset: *c_int,
-                     tableptr: *c_char) -> *pcre;
-    fn pcre_exec(code: *pcre, extra: *pcre_extra,
+                     tableptr: *c_char) -> *Pcre;
+    fn pcre_exec(code: *Pcre, extra: *PcreExtra,
                  subject: *c_char, length: c_int, startoffset: c_int,
                  options: c_int, ovector: * c_int, ovecsize: c_int) -> c_int;
-    fn pcre_fullinfo(code: *pcre, extra: *pcre_extra,
+    fn pcre_fullinfo(code: *Pcre, extra: *PcreExtra,
                      what: c_int, where: *c_void) -> c_int;
-    fn pcre_get_stringnumber(code: *pcre, name: *c_char) -> c_int;
+    fn pcre_get_stringnumber(code: *Pcre, name: *c_char) -> c_int;
 }
 
-impl pattern_util for pattern {
+pub trait PatternUtil {
+    fn info_capture_count() -> uint;
+    fn info_name_count() -> uint;
+    fn info_name_entry_size() -> uint;
+    fn with_name_table(blk: fn(*u8));
+    fn group_count() -> uint;
+    fn group_names() -> ~[~str];
+}
+
+impl Pattern: PatternUtil {
     fn info_capture_count() -> uint {
         let count = -1 as c_int;
         pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
                             PCRE_INFO_CAPTURECOUNT as c_int,
-                            ptr::addr_of(count) as *c_void);
+                            ptr::addr_of(&count) as *c_void);
         assert count >= 0 as c_int;
-        ret count as uint;
+        return count as uint;
     }
 
     fn info_name_count() -> uint {
         let count = -1 as c_int;
         pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
                             PCRE_INFO_NAMECOUNT as c_int,
-                            ptr::addr_of(count) as *c_void);
+                            ptr::addr_of(&count) as *c_void);
         assert count >= 0 as c_int;
-        ret count as uint;
+        return count as uint;
     }
 
     fn info_name_entry_size() -> uint {
         let size = -1 as c_int;
         pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
                             PCRE_INFO_NAMEENTRYSIZE as c_int,
-                            ptr::addr_of(size) as *c_void);
+                            ptr::addr_of(&size) as *c_void);
         assert size >= 0 as c_int;
-        ret size as uint;
+        return size as uint;
     }
 
-    fn with_name_table(blk: fn(*u8)) unsafe {
+    fn with_name_table(blk: fn(*u8)) {
         let table = ptr::null::<u8>();
-        pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
-                            PCRE_INFO_NAMETABLE as c_int,
-                            ptr::addr_of(table) as *c_void);
+        unsafe {
+            pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
+                                PCRE_INFO_NAMETABLE as c_int,
+                                ptr::addr_of(&table) as *c_void);
+        }
         assert table != ptr::null::<u8>();
         blk(table);
     }
 
     fn group_count() -> uint {
-        ret self.info_capture_count();
+        return self.info_capture_count();
     }
 
-    fn group_names() -> ~[str] unsafe {
+    fn group_names() -> ~[~str] {
         let count = self.info_name_count();
-        if count == 0u { ret ~[]; }
+        if count == 0u { return ~[]; }
         let size = self.info_name_entry_size();
-        let mut names: ~[str] = ~[];
+        let mut names: ~[~str] = ~[];
         do self.with_name_table |table| {
             for uint::range(0u, count) |i| {
-                let p = ptr::offset(table, size * i + 2u);
-                let s = str::unsafe::from_c_str(p as *c_char);
-                vec::push(names, s);
+                unsafe {
+                    let p = ptr::offset(table, size * i + 2u);
+                    let s = str::raw::from_c_str(p as *c_char);
+                    vec::push(&mut names, s);
+                }
             }
         }
-        ret names;
+        return names;
     }
 }
 
-iface pattern_like {
-    fn compile(options: int) -> compile_result;
+pub trait PatternLike {
+    fn compile(options: int) -> CompileResult;
 }
 
-impl of pattern_like for str {
-    fn compile(options: int) -> compile_result { compile(self, options) }
+impl &str: PatternLike {
+    fn compile(options: int) -> CompileResult { compile(self, options) }
 }
 
-impl of pattern_like for pattern {
-    fn compile(_options: int) -> compile_result { ok(self) }
+impl ~str: PatternLike {
+    fn compile(options: int) -> CompileResult { compile(self, options) }
 }
 
-impl of pattern_like for compile_result {
-    fn compile(_options: int) -> compile_result { self }
+impl @str: PatternLike {
+    fn compile(options: int) -> CompileResult { compile(self, options) }
 }
 
-impl match_extensions for match {
-    fn matched() -> str {
-        ret str::slice(*self.subject, self.begin(), self.end());
+impl Pattern: PatternLike {
+    fn compile(_options: int) -> CompileResult { Ok(self) }
+}
+
+impl CompileResult: PatternLike {
+    fn compile(_options: int) -> CompileResult { self }
+}
+
+pub trait MatchExtensions {
+    fn matched() -> ~str;
+    fn prematch() -> ~str;
+    fn postmatch() -> ~str;
+    fn begin() -> uint;
+    fn end() -> uint;
+    fn group(i: uint) -> Option<@~str>;
+    fn named_group(name: &str) -> Option<@~str>;
+    fn subgroups() -> ~[~str];
+    fn subgroups_iter(blk: fn(&str));
+    fn group_count() -> uint;
+    fn group_names() -> ~[~str];
+}
+
+impl Match: MatchExtensions {
+    fn matched() -> ~str {
+        return str::slice(*self.subject, self.begin(), self.end());
     }
 
-    fn prematch() -> str {
-        ret str::slice(*self.subject, 0u, self.begin());
+    fn prematch() -> ~str {
+        return str::slice(*self.subject, 0u, self.begin());
     }
 
-    fn postmatch() -> str {
-        ret str::slice(*self.subject ,self.end(),
-                       str::char_len(*self.subject));
+    fn postmatch() -> ~str {
+        return str::slice(*self.subject ,self.end(),
+                          str::char_len(*self.subject));
     }
 
     fn begin() -> uint {
-        ret self._captures[0];
+        return self._captures[0];
     }
 
     fn end() -> uint {
-        ret self._captures[1];
+        return self._captures[1];
     }
 
-    fn group(i: uint) -> option<str> {
+    fn group(i: uint) -> Option<@~str> {
         if i > self.group_count() {
-            ret none;
+            return None;
         }
-        ret some(str::slice(*self.subject,
-                            self._captures[i * 2u],
-                            self._captures[i * 2u + 1u]));
+        return Some(@str::slice(*self.subject,
+                                self._captures[i * 2u],
+                                self._captures[i * 2u + 1u]));
     }
 
-    fn named_group(name: str) -> option<str> {
-        let i = str::as_buf(name, |s| {
+    fn named_group(name: &str) -> Option<@~str> {
+        let i = str::as_buf(name, |s, _n| {
             pcre::pcre_get_stringnumber(self.pattern._pcre_res.p, s as *c_char)
         });
-        if i <= 0 as c_int { ret none; }
-        ret self.group(i as uint);
+        if i <= 0 as c_int { return None; }
+        return self.group(i as uint);
     }
 
-    fn subgroups() -> ~[str] {
+    fn subgroups() -> ~[~str] {
         let mut v = ~[];
-        vec::reserve(v, self.group_count());
-        do self.subgroups_iter |elt| { vec::push(v, copy elt); }
-        ret v;
+        vec::reserve(&mut v, self.group_count());
+        do self.subgroups_iter |subgroup| { vec::push(&mut v, str::from_slice(subgroup)); }
+        return v;
     }
 
-    fn subgroups_iter(blk: fn(str)) {
+    fn subgroups_iter(blk: fn(&str)) {
         for uint::range(1u, self.group_count() + 1u) |i| {
-            alt self.group(i) {
-              some(s) { blk(s); }
-              none { fail; }
+            match self.group(i) {
+              Some(s) => blk(*s),
+              None => fail,
             }
         }
     }
 
     fn group_count() -> uint {
-        ret vec::len(*self._captures) / 2u - 1u;
+        return vec::len(*self._captures) / 2u - 1u;
     }
 
-    fn group_names() -> ~[str] {
-        ret self.pattern.group_names();
+    fn group_names() -> ~[~str] {
+        return self.pattern.group_names();
     }
 }
 
-fn compile(pattern: str, options: int) -> compile_result unsafe {
+pub fn compile(pattern: &str, options: int) -> CompileResult unsafe {
     if options | COMPILE_OPTIONS != COMPILE_OPTIONS {
         #warn("unrecognized option bit(s) are set");
     }
@@ -402,25 +400,25 @@ fn compile(pattern: str, options: int) -> compile_result unsafe {
     let errcode = 0 as c_int;
     let errreason: *c_char = ptr::null();
     let erroffset = 0 as c_int;
-    let p = str::as_buf(pattern, |pat| {
+    let p = str::as_buf(pattern, |pat, _n| {
         pcre::pcre_compile2(pat as *c_char,
                             options as c_int,
-                            ptr::addr_of(errcode),
-                            ptr::addr_of(errreason),
-                            ptr::addr_of(erroffset),
+                            ptr::addr_of(&errcode),
+                            ptr::addr_of(&errreason),
+                            ptr::addr_of(&erroffset),
                             ptr::null())
     });
     if p == ptr::null() {
-        ret err({code: errcode as int,
-                 reason: @str::unsafe::from_c_str(errreason),
-                 offset: erroffset as uint});
+        return Err({code: errcode as int,
+                    reason: @str::raw::from_c_str(errreason),
+                    offset: erroffset as uint});
     }
-    ret ok({str: @copy pattern, _pcre_res: @pcre_res(p)});
+    return Ok({str: @str::from_slice(pattern), _pcre_res: @PcreRes {p: p}});
 }
 
-fn exec(pattern: pattern,
-        subject: str, offset: uint,
-        options: int) -> exec_result unsafe {
+pub fn exec(pattern: Pattern,
+        subject: &str, offset: uint,
+        options: int) -> ExecResult unsafe {
 
     if (options | EXEC_OPTIONS) != EXEC_OPTIONS {
         #warn("unrecognized option bit(s) are set");
@@ -431,200 +429,208 @@ fn exec(pattern: pattern,
     let count = (pattern.info_capture_count() + 1u) as c_int;
     let mut ovec = vec::from_elem((count as uint) * 3u, 0u as c_int);
 
-    let ret_code = str::as_buf(subject, |s| {
+    let ret_code = str::as_buf(subject, |s, _n| {
         pcre::pcre_exec(pattern._pcre_res.p, ptr::null(),
                         s as *c_char, str::len(subject) as c_int,
                         offset as c_int, options as c_int,
-                        vec::unsafe::to_ptr(ovec) as *c_int,
+                        vec::raw::to_ptr(ovec) as *c_int,
                         count * (3 as c_int)) as int
     });
 
-    if ret_code < 0 { ret err(ret_code as match_err); }
+    if ret_code < 0 { return Err(ret_code as ExecErr); }
 
     // Cut off the working space
-    vec::unsafe::set_len(ovec, count as uint * 2u);
+    vec::raw::set_len(&mut ovec, count as uint * 2u);
 
     let mut captures: ~[uint] = ~[];
-    vec::reserve(captures, vec::len(ovec));
+    vec::reserve(&mut captures, vec::len(ovec));
     for ovec.each |o| {
-        if o as int < 0 { again; }
-        vec::push(captures, o as uint);
+        if *o as int < 0 { loop; }
+        vec::push(&mut captures, *o as uint);
     }
     assert vec::len(captures) % 2u == 0u;
 
-    ret ok({subject: @copy subject, pattern: pattern, _captures: @captures});
+    return Ok({subject: @str::from_slice(subject), pattern: pattern, _captures: @captures});
 }
 
-fn match<T: pattern_like>(pattern: T, subject: str,
-                          options: int) -> match_result {
-    ret match_from(pattern, subject, 0u, options);
+pub fn search<T: PatternLike>(pattern: T, subject: &str,
+                          options: int) -> SearchResult {
+    return search_from(pattern, subject, 0u, options);
 }
 
-fn match_from<T: pattern_like>(pattern: T, subject: str,
-                               offset: uint, options: int) -> match_result {
+pub fn search_from<T: PatternLike>(pattern: T, subject: &str,
+                               offset: uint, options: int) -> SearchResult {
     assert offset <= str::len(subject);
 
     let c_opts = options & COMPILE_OPTIONS;
     let e_opts = options & EXEC_OPTIONS;
 
     let c = pattern.compile(c_opts);
-    alt c {
-      ok(pattern) {
+    match c {
+      Ok(pattern) => {
         let e = exec(pattern, subject, offset, e_opts);
-        alt e {
-          ok(match) {
-            ret ok(match);
+        match e {
+          Ok(m) => {
+            return Ok(m);
           }
-          err(m_err) {
-            ret err(match_err(m_err));
+          Err(e_err) => {
+            return Err(ExecErr(e_err));
           }
         }
       }
-      err(c_err) {
-          ret err(compile_err(c_err));
+      Err(c_err) => {
+          return Err(CompileErr(c_err));
       }
     }
 }
 
-fn replace<T: pattern_like>(pattern: T, subject: str, repl: str,
-                            options: int) -> replace_result {
-    ret replace_fn_from(pattern, subject, |_m| { copy repl }, 0u, options);
+pub fn replace<T: PatternLike Copy>(pattern: T, subject: &str, repl: &str,
+                                options: int) -> ReplaceResult {
+    return replace_fn_from(pattern, subject, |_m| { str::from_slice(repl) }, 0u, options);
 }
 
-fn replace_from<T: pattern_like>(pattern: T, subject: str, repl: str,
-                                 offset: uint, options: int)
-                                 -> replace_result {
-    ret replace_fn_from(pattern, subject, |_m| { copy repl }, offset, options);
+pub fn replace_from<T: PatternLike Copy>(pattern: T, subject: &str, repl: &str,
+                                     offset: uint, options: int)
+                                     -> ReplaceResult {
+    return replace_fn_from(pattern, subject, |_m| { str::from_slice(repl) }, offset, options);
 }
 
-fn replace_fn<T: pattern_like>(pattern: T, subject: str,
-                               repl_fn: fn(match) -> str, options: int)
-                               -> replace_result {
-    ret replace_fn_from(pattern, subject, repl_fn, 0u, options);
+pub fn replace_fn<T: PatternLike Copy>(pattern: T, subject: &str,
+                                   repl_fn: fn(Match) -> ~str, options: int)
+                                   -> ReplaceResult {
+    return replace_fn_from(pattern, subject, repl_fn, 0u, options);
 }
 
-fn replace_fn_from<T: pattern_like>(pattern: T, subject: str,
-                                    repl_fn: fn(match) -> str, offset: uint,
-                                    options: int)
-                                    -> replace_result {
-    let r = match_from(pattern, subject, offset, options);
-    alt r {
-      ok(m) {
-        ret ok(m.prematch() + repl_fn(m) + m.postmatch());
-      }
-      err(e) { ret err(e); }
-    }
-}
-
-fn replace_all<T: pattern_like>(pattern: T, subject: str,
-                                repl: str,
-                                options: int)
-                                -> replace_result {
-    ret replace_all_fn_from(pattern, subject, |_m| { copy repl }, 0u, options);
-}
-
-fn replace_all_fn<T: pattern_like>(pattern: T, subject: str,
-                                   repl_fn: fn(match) -> str,
-                                   options: int)
-                                   -> replace_result {
-    ret replace_all_fn_from(pattern, subject, repl_fn, 0u, options);
-}
-
-fn replace_all_from<T: pattern_like>(pattern: T, subject: str,
-                                     repl: str,
-                                     offset: uint,
-                                     options: int)
-                                     -> replace_result {
-    ret replace_all_fn_from(pattern, subject, |_m| { copy repl }, offset, options);
-}
-
-fn replace_all_fn_from<T: pattern_like>(pattern: T, subject: str,
-                                        repl_fn: fn(match) -> str,
-                                        offset: uint,
+pub fn replace_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
+                                        repl_fn: fn(Match) -> ~str, offset: uint,
                                         options: int)
-                                        -> replace_result {
+                                        -> ReplaceResult {
+    let r = search_from(pattern, subject, offset, options);
+    match r {
+      Ok(m) => {
+        return Ok(@(m.prematch() + repl_fn(m) + m.postmatch()));
+      }
+      Err(e) => { return Err(e); }
+    }
+}
+
+pub fn replace_all<T: PatternLike Copy>(pattern: T, subject: &str,
+                                    repl: &str,
+                                    options: int)
+                                    -> ReplaceResult {
+    return replace_all_fn_from(pattern, subject, |_m| { str::from_slice(repl) }, 0u, options);
+}
+
+pub fn replace_all_fn<T: PatternLike Copy>(pattern: T, subject: &str,
+                                       repl_fn: fn(Match) -> ~str,
+                                       options: int)
+                                       -> ReplaceResult {
+    return replace_all_fn_from(pattern, subject, repl_fn, 0u, options);
+}
+
+pub fn replace_all_from<T: PatternLike Copy>(pattern: T, subject: &str,
+                                         repl: &str,
+                                         offset: uint,
+                                         options: int)
+                                         -> ReplaceResult {
+    return replace_all_fn_from(pattern, subject, |_m| { str::from_slice(repl) }, offset, options);
+}
+
+pub fn replace_all_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
+                                            repl_fn: fn(Match) -> ~str,
+                                            offset: uint,
+                                            options: int)
+                                            -> ReplaceResult {
     let mut offset = offset;
     let subject_len = str::len(subject);
     assert offset <= subject_len;
 
     let mut s = str::slice(subject, 0, offset);
     loop {
-        let r = match_from(pattern, subject, offset, options);
-        alt r {
-          ok(m) {
+        let r = search_from(pattern, subject, offset, options);
+        match r {
+          Ok(m) => {
             s += str::slice(subject, offset, m.begin());
             s += repl_fn(m);
             offset = m.end();
           }
-          err(match_err(e)) if e == PCRE_ERROR_NOMATCH {
+          Err(ExecErr(e)) if e == PCRE_ERROR_NOMATCH => {
             if offset != subject_len {
                 s += str::slice(subject, offset, subject_len);
             }
             break;
           }
-          err(e) {
-            ret err(copy e);
+          Err(e) => {
+            return Err(copy e);
           }
         }
     }
-    ret ok(s);
+    return Ok(@s);
 }
 
-fn fmt_compile_err(e: compile_err) -> str {
-    ret #fmt("error %d: %s at offset %u", e.code, *e.reason, e.offset);
+pub fn fmt_compile_err(e: CompileErr) -> ~str {
+    return fmt!("error %d: %s at offset %u", e.code, *e.reason, e.offset);
 }
+
 
 #[doc = "
-Returns true iff mr indicates that the subject did not match the pattern.
+Returns true iff sr indicates that the subject did not match the pattern.
 "]
-pure fn is_nomatch(mr: match_result) -> bool {
-    ret alt mr {
-      err(match_err(e)) if e == PCRE_ERROR_NOMATCH { true }
-      _ { false }
-    };
+pure fn is_nomatch(sr: SearchResult) -> bool {
+    match sr {
+      Err(ExecErr(e)) if e == PCRE_ERROR_NOMATCH => true,
+      _ => false,
+    }
 }
 
 #[cfg(test)]
 mod test_util {
-    export option_util;
-    export result_util;
+    pub trait OptionUtil<T> {
+        fn is_some_and(blk: fn(T) -> bool) -> bool;
+        fn is_none_and(blk: fn() -> bool) -> bool;
+    }
 
-    impl option_util<T> for option<T> {
+    impl<T: Copy> Option<T>: OptionUtil<T> {
         fn is_some_and(blk: fn(T) -> bool) -> bool {
-            ret alt self {
-              some(t) { blk(t) }
-              none { false }
-            };
+            match self {
+              Some(t) => blk(t),
+              None => false,
+            }
         }
 
         // Who wants?
         fn is_none_and(blk: fn() -> bool) -> bool {
-            ret alt self {
-              some(_) { false }
-              none { blk() }
-            };
+            match self {
+              Some(_) => false,
+              None => blk(),
+            }
         }
     }
 
-    impl result_util<T, U> for result<T, U> {
+    pub trait ResultUtil<T, U> {
+        fn is_ok_and(blk: fn(T) -> bool) -> bool;
+        fn is_err_and(blk: fn(U) -> bool) -> bool;
+    }
+
+    impl<T: Copy, U: Copy> Result<T, U>: ResultUtil<T, U> {
         fn is_ok_and(blk: fn(T) -> bool) -> bool {
-            ret alt self {
-              ok(t) { blk(t) }
-              err(_) { false }
-            };
+            match self {
+              Ok(t) => blk(t),
+              Err(_) => false,
+            }
         }
 
         fn is_err_and(blk: fn(U) -> bool) -> bool {
-            ret alt self {
-              ok(_) { false }
-              err(u) { blk(u) }
-            };
+            match self {
+              Ok(_) => false,
+              Err(u) => blk(u),
+            }
         }
     }
 
     #[test]
     fn test_option_util() {
-        let s = some(42);
+        let s = Some(42);
 
         assert  s.is_some();
         assert  s.is_some_and(|i| i == 42);
@@ -634,7 +640,7 @@ mod test_util {
         assert !s.is_none_and(|| true);
         assert !s.is_none_and(|| false);
 
-        let n = none::<()>;
+        let n = None::<()>;
 
         assert  n.is_none();
         assert  n.is_none_and(|| true);
@@ -648,7 +654,7 @@ mod test_util {
 
     #[test]
     fn test_result_util() {
-        let o: result<int, ()> = ok(42);
+        let o: Result<int, ()> = Ok(42);
 
         assert  o.is_ok();
         assert  o.is_ok_and(|i| i == 42);
@@ -658,7 +664,7 @@ mod test_util {
         assert !o.is_err_and(|_nil| true);
         assert !o.is_err_and(|_nil| false);
 
-        let e: result<(), int> = err(42);
+        let e: Result<(), int> = Err(42);
 
         assert  e.is_err();
         assert  e.is_err_and(|i| i == 42);
@@ -670,9 +676,10 @@ mod test_util {
     }
 }
 
+
 #[cfg(test)]
 mod test {
-    import test_util::*;
+    use test_util::*;
 
     #[test]
     fn test_compile() {
@@ -682,134 +689,133 @@ mod test {
         let r = compile("foo(", 0);
         assert do r.is_err_and |e| {
             assert e.code == 14;
-            assert *e.reason == "missing )";
+            assert e.reason == @~"missing )";
             assert e.offset == 4u;
             true
         }
     }
 
     #[test]
-    fn test_match() {
-        let r = match("(foo)bar", "foobar", 0);
+    fn test_search() {
+        let r = search("(foo)bar", "foobar", 0);
         assert r.is_ok();
 
         let c = compile("(foo)bar", 0);
-        let r = match(c, "foobar", 0);
+        let r = search(c, "foobar", 0);
         assert r.is_ok();
 
-        let r = match("foo(", "foobar", 0);
-        alt r {
-          err(compile_err(e)) {
+        let r = search("foo(", "foobar", 0);
+        match r {
+          Err(CompileErr(e)) => {
             assert e.code == 14;
-            assert *e.reason == "missing )";
+            assert e.reason == @~"missing )";
             assert e.offset == 4u;
           }
-          _ { fail; }
+          _ => { fail; }
         }
 
-        let r = match("(foo)bar", "baz", 0);
+        let r = search("(foo)bar", "baz", 0);
         assert is_nomatch(r);
 
-        let r = match("はにほ", "いろはにほへと", 0);
+        let r = search("はにほ", "いろはにほへと", 0);
         assert r.is_ok_and(|m| m.begin() == 6u && m.end() == 15u);
 
-        let r = match("ちりぬ", "いろはにほへと", 0);
+        let r = search("ちりぬ", "いろはにほへと", 0);
         assert is_nomatch(r);
     }
 
     // compile() accepts compile options (obviously)
     #[test]
-    fn test_match_options_0() {
-        let r = match(compile("foobar", PCRE_CASELESS), "FOOBAR", 0);
+    fn test_search_options_0() {
+        let r = search(compile("foobar", PCRE_CASELESS), "FOOBAR", 0);
         assert r.is_ok();
     }
 
-    // match() accepts compile options
+    // search() accepts compile options
     #[test]
-    fn test_match_options_1() {
-        let r = match("foobar", "FOOBAR", PCRE_CASELESS);
+    fn test_search_options_1() {
+        let r = search("foobar", "FOOBAR", PCRE_CASELESS);
         assert r.is_ok();
     }
 
-    // Inline options supersedes match-time compile options
+    // Inline options supersedes exec-time compile options
     #[test]
-    fn test_match_options_2() {
-        let r = match("(?-i)foobar", "FOOBAR", PCRE_CASELESS);
+    fn test_search_options_2() {
+        let r = search("(?-i)foobar", "FOOBAR", PCRE_CASELESS);
         assert r.is_err();
     }
 
-    // Compile-time compile options supersedes match-time compile options
+    // Compile-time compile options supersedes exec-time compile options
     #[test]
-    fn test_match_options_3() {
-        let r = match(compile("foobar", 0), "FOOBAR", PCRE_CASELESS);
+    fn test_search_options_3() {
+        let r = search(compile("foobar", 0), "FOOBAR", PCRE_CASELESS);
         assert r.is_err();
     }
 
     #[test]
     fn test_replace() {
         let r = replace("bcd", "AbcdbcdbcdE", "BCD", 0);
-        assert r.is_ok_and(|s| s == "ABCDbcdbcdE");
+        assert r.is_ok_and(|s| s == @~"ABCDbcdbcdE");
     }
 
     #[test]
     fn test_replace_from() {
         let r = replace_from("bcd", "AbcdbcdbcdE", "BCD", 2u, 0);
-        assert r.is_ok_and(|s| s == "AbcdBCDbcdE");
+        assert r.is_ok_and(|s| s == @~"AbcdBCDbcdE");
     }
 
     #[test]
     fn test_replace_fn() {
         let r = replace_fn("bcd", "AbcdbcdbcdE",
                            |m| { str::to_upper(m.matched()) }, 0);
-        assert r.is_ok_and(|s| s == "ABCDbcdbcdE");
+        assert r.is_ok_and(|s| s == @~"ABCDbcdbcdE");
     }
 
     #[test]
     fn test_replace_fn_from() {
         let r = replace_fn_from("bcd", "AbcdbcdbcdE",
                                 |m| { str::to_upper(m.matched()) }, 2u, 0);
-        assert r.is_ok_and(|s| s == "AbcdBCDbcdE");
+        assert r.is_ok_and(|s| s == @~"AbcdBCDbcdE");
     }
 
     #[test]
     fn test_replace_all() {
         let r = replace_all("bcd", "AbcdbcdbcdE", "BCD", 0);
-        assert r.is_ok_and(|s| s == "ABCDBCDBCDE");
+        assert r.is_ok_and(|s| s == @~"ABCDBCDBCDE");
     }
 
     #[test]
     fn test_replace_all_from() {
         let r = replace_all_from("bcd", "AbcdbcdbcdE", "BCD", 2u, 0);
-        assert r.is_ok_and(|s| s == "AbcdBCDBCDE");
+        assert r.is_ok_and(|s| s == @~"AbcdBCDBCDE");
     }
 
     #[test]
     fn test_replace_all_fn() {
         let r = replace_all_fn("bcd", "AbcdbcdbcdE",
                                 |m| { str::to_upper(m.matched()) }, 0);
-        assert r.is_ok_and(|s| s == "ABCDBCDBCDE");
+        assert r.is_ok_and(|s| s == @~"ABCDBCDBCDE");
     }
 
     #[test]
     fn test_replace_all_fn_from() {
         let r = replace_all_fn_from("bcd", "AbcdbcdbcdE",
                                     |m| { str::to_upper(m.matched()) }, 2u, 0);
-        assert r.is_ok_and(|s| s == "AbcdBCDBCDE");
+        assert r.is_ok_and(|s| s == @~"AbcdBCDBCDE");
     }
 }
 
 #[cfg(test)]
 mod test_match_extensions {
-    import result::*;
-    import test_util::*;
+    use test_util::*;
 
     #[test]
     fn test_group() {
-        let r = match("(foo)bar(baz)", "foobarbaz", 0);
+        let r = search("(foo)bar(baz)", "foobarbaz", 0);
         assert do r.is_ok_and |m| {
-            assert m.group(0u).is_some_and(|s| s == "foobarbaz");
-            assert m.group(1u).is_some_and(|s| s == "foo");
-            assert m.group(2u).is_some_and(|s| s == "baz");
+            assert m.group(0u).is_some_and(|s| s == @~"foobarbaz");
+            assert m.group(1u).is_some_and(|s| s == @~"foo");
+            assert m.group(2u).is_some_and(|s| s == @~"baz");
             assert m.group(3u).is_none();
             true
         }
@@ -817,43 +823,43 @@ mod test_match_extensions {
 
     #[test]
     fn test_subgroups() {
-        let r = match("(foo)bar(baz)", "foobarbaz", 0);
+        let r = search("(foo)bar(baz)", "foobarbaz", 0);
         assert do r.is_ok_and |m| {
-            do vec::all2(m.subgroups(), ~["foo", "baz"]) |s, t| { s == t }
+            do vec::all2(m.subgroups(), ~[~"foo", ~"baz"]) |s, t| { s == t }
         }
     }
 
     #[test]
     fn test_group_count() {
-        let r = match("foobarbaz", "foobarbaz", 0);
+        let r = search("foobarbaz", "foobarbaz", 0);
         assert r.is_ok_and(|m| m.group_count() == 0u);
 
-        let r = match("(foo)bar(baz)", "foobarbaz", 0);
+        let r = search("(foo)bar(baz)", "foobarbaz", 0);
         assert r.is_ok_and(|m| m.group_count() == 2u);
 
-        let r = match("(?:foo)bar", "foobar", 0);
+        let r = search("(?:foo)bar", "foobar", 0);
         assert r.is_ok_and(|m| m.group_count() == 0u);
 
-        let r = match("(?:(foo)|baz)bar", "foobar", 0);
+        let r = search("(?:(foo)|baz)bar", "foobar", 0);
         assert r.is_ok_and(|m| m.group_count() == 1u);
 
-        let r = match("(?:foo|(baz))bar", "foobar", 0);
+        let r = search("(?:foo|(baz))bar", "foobar", 0);
         assert r.is_ok_and(|m| m.group_count() == 0u);
     }
 
     #[test]
     fn test_group_names() {
-        let r = match("(?<foo_name>foo)bar", "foobar", 0);
+        let r = search("(?<foo_name>foo)bar", "foobar", 0);
         assert do r.is_ok_and |m| {
-            do vec::all2(m.group_names(), ~["foo_name"]) |s, t| { s == t }
+            do vec::all2(m.group_names(), ~[~"foo_name"]) |s, t| { s == t }
         }
     }
 
     #[test]
     fn test_named_group() {
-        let r = match("(?<foo_name>f..)bar", "foobar", 0);
+        let r = search("(?<foo_name>f..)bar", "foobar", 0);
         assert do r.is_ok_and |m| {
-            assert m.named_group("foo_name").is_some_and(|s| s == "foo");
+            assert m.named_group("foo_name").is_some_and(|s| s == @~"foo");
             assert m.named_group("nonexistent").is_none();
             true
         }
