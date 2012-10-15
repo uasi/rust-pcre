@@ -454,12 +454,12 @@ pub fn exec(pattern: Pattern,
 }
 
 pub fn search<T: PatternLike>(pattern: T, subject: &str,
-                          options: int) -> SearchResult {
+                              options: int) -> SearchResult {
     return search_from(pattern, subject, 0u, options);
 }
 
 pub fn search_from<T: PatternLike>(pattern: T, subject: &str,
-                               offset: uint, options: int) -> SearchResult {
+                                   offset: uint, options: int) -> SearchResult {
     assert offset <= str::len(subject);
 
     let c_opts = options & COMPILE_OPTIONS;
@@ -467,80 +467,80 @@ pub fn search_from<T: PatternLike>(pattern: T, subject: &str,
 
     let c = pattern.compile(c_opts);
     match c {
-      Ok(pattern) => {
-        let e = exec(pattern, subject, offset, e_opts);
-        match e {
-          Ok(m) => {
-            return Ok(m);
-          }
-          Err(e_err) => {
-            return Err(ExecErr(e_err));
-          }
+        Ok(pattern) => {
+            let e = exec(pattern, subject, offset, e_opts);
+            match e {
+                Ok(m) => {
+                    return Ok(m);
+                }
+                Err(e_err) => {
+                    return Err(ExecErr(e_err));
+                }
+            }
         }
-      }
-      Err(c_err) => {
-          return Err(CompileErr(c_err));
-      }
+        Err(c_err) => {
+            return Err(CompileErr(c_err));
+        }
     }
 }
 
 pub fn replace<T: PatternLike Copy>(pattern: T, subject: &str, repl: &str,
-                                options: int) -> ReplaceResult {
+                                    options: int) -> ReplaceResult {
     return replace_fn_from(pattern, subject, |_m| { str::from_slice(repl) }, 0u, options);
 }
 
 pub fn replace_from<T: PatternLike Copy>(pattern: T, subject: &str, repl: &str,
-                                     offset: uint, options: int)
-                                     -> ReplaceResult {
+                                         offset: uint, options: int)
+                                         -> ReplaceResult {
     return replace_fn_from(pattern, subject, |_m| { str::from_slice(repl) }, offset, options);
 }
 
 pub fn replace_fn<T: PatternLike Copy>(pattern: T, subject: &str,
-                                   repl_fn: fn(Match) -> ~str, options: int)
-                                   -> ReplaceResult {
+                                       repl_fn: fn(Match) -> ~str, options: int)
+                                       -> ReplaceResult {
     return replace_fn_from(pattern, subject, repl_fn, 0u, options);
 }
 
 pub fn replace_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
-                                        repl_fn: fn(Match) -> ~str, offset: uint,
-                                        options: int)
-                                        -> ReplaceResult {
+                                            repl_fn: fn(Match) -> ~str, offset: uint,
+                                            options: int)
+                                            -> ReplaceResult {
     let r = search_from(pattern, subject, offset, options);
     match r {
-      Ok(m) => {
-        return Ok(@(m.prematch() + repl_fn(m) + m.postmatch()));
-      }
-      Err(e) => { return Err(e); }
+        Ok(m) => {
+            return Ok(@(m.prematch() + repl_fn(m) + m.postmatch()));
+        }
+        Err(e) => { return Err(e); }
     }
 }
 
 pub fn replace_all<T: PatternLike Copy>(pattern: T, subject: &str,
-                                    repl: &str,
-                                    options: int)
-                                    -> ReplaceResult {
+                                        repl: &str,
+                                        options: int)
+                                        -> ReplaceResult {
     return replace_all_fn_from(pattern, subject, |_m| { str::from_slice(repl) }, 0u, options);
 }
 
 pub fn replace_all_fn<T: PatternLike Copy>(pattern: T, subject: &str,
-                                       repl_fn: fn(Match) -> ~str,
-                                       options: int)
-                                       -> ReplaceResult {
+                                           repl_fn: fn(Match) -> ~str,
+                                           options: int)
+                                           -> ReplaceResult {
     return replace_all_fn_from(pattern, subject, repl_fn, 0u, options);
 }
 
 pub fn replace_all_from<T: PatternLike Copy>(pattern: T, subject: &str,
-                                         repl: &str,
-                                         offset: uint,
-                                         options: int)
-                                         -> ReplaceResult {
+                                             repl: &str,
+                                             offset: uint,
+                                             options: int)
+                                             -> ReplaceResult {
     return replace_all_fn_from(pattern, subject, |_m| { str::from_slice(repl) }, offset, options);
 }
 
 pub fn replace_all_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
-                                            repl_fn: fn(Match) -> ~str,
-                                            offset: uint,
-                                            options: int)
-                                            -> ReplaceResult {
+                                                repl_fn: fn(Match) -> ~str,
+                                                offset: uint,
+                                                options: int)
+                                                -> ReplaceResult {
     let mut offset = offset;
     let subject_len = str::len(subject);
     assert offset <= subject_len;
@@ -549,20 +549,20 @@ pub fn replace_all_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
     loop {
         let r = search_from(pattern, subject, offset, options);
         match r {
-          Ok(m) => {
-            s += str::slice(subject, offset, m.begin());
-            s += repl_fn(m);
-            offset = m.end();
-          }
-          Err(ExecErr(e)) if e == PCRE_ERROR_NOMATCH => {
-            if offset != subject_len {
-                s += str::slice(subject, offset, subject_len);
+            Ok(m) => {
+                s += str::slice(subject, offset, m.begin());
+                s += repl_fn(m);
+                offset = m.end();
             }
-            break;
-          }
-          Err(e) => {
-            return Err(copy e);
-          }
+            Err(ExecErr(e)) if e == PCRE_ERROR_NOMATCH => {
+                if offset != subject_len {
+                    s += str::slice(subject, offset, subject_len);
+                }
+                break;
+            }
+            Err(e) => {
+                return Err(copy e);
+            }
         }
     }
     return Ok(@s);
@@ -593,16 +593,16 @@ mod test_util {
     impl<T: Copy> Option<T>: OptionUtil<T> {
         fn is_some_and(blk: fn(T) -> bool) -> bool {
             match self {
-              Some(t) => blk(t),
-              None => false,
+                Some(t) => blk(t),
+                None => false,
             }
         }
 
         // Who wants?
         fn is_none_and(blk: fn() -> bool) -> bool {
             match self {
-              Some(_) => false,
-              None => blk(),
+                Some(_) => false,
+                None => blk(),
             }
         }
     }
@@ -615,15 +615,15 @@ mod test_util {
     impl<T: Copy, U: Copy> Result<T, U>: ResultUtil<T, U> {
         fn is_ok_and(blk: fn(T) -> bool) -> bool {
             match self {
-              Ok(t) => blk(t),
-              Err(_) => false,
+                Ok(t) => blk(t),
+                Err(_) => false,
             }
         }
 
         fn is_err_and(blk: fn(U) -> bool) -> bool {
             match self {
-              Ok(_) => false,
-              Err(u) => blk(u),
+                Ok(_) => false,
+                Err(u) => blk(u),
             }
         }
     }
@@ -706,12 +706,12 @@ mod test {
 
         let r = search("foo(", "foobar", 0);
         match r {
-          Err(CompileErr(e)) => {
-            assert e.code == 14;
-            assert e.reason == @~"missing )";
-            assert e.offset == 4u;
-          }
-          _ => { fail; }
+            Err(CompileErr(e)) => {
+                assert e.code == 14;
+                assert e.reason == @~"missing )";
+                assert e.offset == 4u;
+            }
+            _ => { fail; }
         }
 
         let r = search("(foo)bar", "baz", 0);
