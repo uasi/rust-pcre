@@ -169,11 +169,11 @@ pub type ReplaceResult = Result<@~str, RegexErr>;
 #[doc = "
 The type that represents compile error.
 "]
-pub type CompileErr = {
+pub struct CompileErr {
     code: int,
     reason: @~str,
     offset: uint,
-};
+}
 
 #[doc = "
 The type that represents exec error.
@@ -188,16 +188,16 @@ pub enum RegexErr {
     ExecErr(ExecErr),
 }
 
-pub type Pattern = {
+pub struct Pattern {
     str: @~str,
     _pcre_res: @PcreRes,
-};
+}
 
-pub type Match = {
+pub struct Match {
     subject: @~str,
     pattern: Pattern,
     _captures: @~[uint],
-};
+}
 
 #[nolink]
 #[abi = "cdecl"]
@@ -419,11 +419,11 @@ pub fn compile(pattern: &str, options: int) -> CompileResult {
         })
     };
     if p == ptr::null() {
-        return Err({code: errcode as int,
-                    reason: unsafe { @str::raw::from_c_str(errreason) },
-                    offset: erroffset as uint});
+        return Err(CompileErr {code: errcode as int,
+                               reason: unsafe { @str::raw::from_c_str(errreason) },
+                               offset: erroffset as uint});
     }
-    return Ok({str: @str::from_slice(pattern), _pcre_res: @PcreRes {p: p}});
+    return Ok(Pattern {str: @str::from_slice(pattern), _pcre_res: @PcreRes {p: p}});
 }
 
 pub fn exec(pattern: Pattern,
@@ -462,7 +462,7 @@ pub fn exec(pattern: Pattern,
     }
     assert vec::len(captures) % 2u == 0u;
 
-    return Ok({subject: @str::from_slice(subject), pattern: pattern, _captures: @captures});
+    return Ok(Match {subject: @str::from_slice(subject), pattern: pattern, _captures: @captures});
 }
 
 pub fn search<T: PatternLike>(pattern: T, subject: &str,
