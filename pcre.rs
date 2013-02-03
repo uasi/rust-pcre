@@ -391,7 +391,7 @@ impl Match: MatchExtensions {
     }
 }
 
-pub fn compile(pattern: &str, options: int) -> CompileResult unsafe {
+pub fn compile(pattern: &str, options: int) -> CompileResult {
     if options | COMPILE_OPTIONS != COMPILE_OPTIONS {
         warn!("unrecognized option bit(s) are set");
     }
@@ -400,14 +400,16 @@ pub fn compile(pattern: &str, options: int) -> CompileResult unsafe {
     let errcode = 0 as c_int;
     let errreason: *c_char = ptr::null();
     let erroffset = 0 as c_int;
-    let p = str::as_buf(pattern, |pat, _n| {
-        pcre::pcre_compile2(pat as *c_char,
-                            options as c_int,
-                            ptr::addr_of(&errcode),
-                            ptr::addr_of(&errreason),
-                            ptr::addr_of(&erroffset),
-                            ptr::null())
-    });
+    let p = unsafe {
+        str::as_buf(pattern, |pat, _n| {
+            pcre::pcre_compile2(pat as *c_char,
+                                options as c_int,
+                                ptr::addr_of(&errcode),
+                                ptr::addr_of(&errreason),
+                                ptr::addr_of(&erroffset),
+                                ptr::null())
+        });
+    };
     if p == ptr::null() {
         return Err({code: errcode as int,
                     reason: @str::raw::from_c_str(errreason),
@@ -418,7 +420,7 @@ pub fn compile(pattern: &str, options: int) -> CompileResult unsafe {
 
 pub fn exec(pattern: Pattern,
         subject: &str, offset: uint,
-        options: int) -> ExecResult unsafe {
+        options: int) -> ExecResult {
 
     if (options | EXEC_OPTIONS) != EXEC_OPTIONS {
         warn!("unrecognized option bit(s) are set");
@@ -429,13 +431,15 @@ pub fn exec(pattern: Pattern,
     let count = (pattern.info_capture_count() + 1u) as c_int;
     let mut ovec = vec::from_elem((count as uint) * 3u, 0u as c_int);
 
-    let ret_code = str::as_buf(subject, |s, _n| {
-        pcre::pcre_exec(pattern._pcre_res.p, ptr::null(),
-                        s as *c_char, str::len(subject) as c_int,
-                        offset as c_int, options as c_int,
-                        vec::raw::to_ptr(ovec) as *c_int,
-                        count * (3 as c_int)) as int
-    });
+    let ret_code = unsafe {
+        str::as_buf(subject, |s, _n| {
+            pcre::pcre_exec(pattern._pcre_res.p, ptr::null(),
+                            s as *c_char, str::len(subject) as c_int,
+                            offset as c_int, options as c_int,
+                            vec::raw::to_ptr(ovec) as *c_int,
+                            count * (3 as c_int)) as int
+        });
+    };
 
     if ret_code < 0 { return Err(ret_code as ExecErr); }
 
