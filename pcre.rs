@@ -690,7 +690,7 @@ mod test_util {
 
 
 #[cfg(test)]
-mod test {
+mod tests {
     use test_util::*;
 
     #[test]
