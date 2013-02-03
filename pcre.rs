@@ -143,7 +143,7 @@ enum Pcre {}
 enum PcreExtra {}
 struct PcreRes {
     p: *Pcre,
-    drop { c::free(self.p as *c_void); }
+    drop { unsafe { c::free(self.p as *c_void); } }
 }
 
 #[doc = "
@@ -231,27 +231,33 @@ pub trait PatternUtil {
 impl Pattern: PatternUtil {
     fn info_capture_count() -> uint {
         let count = -1 as c_int;
-        pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
-                            PCRE_INFO_CAPTURECOUNT as c_int,
-                            ptr::addr_of(&count) as *c_void);
+        unsafe {
+            pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
+                                PCRE_INFO_CAPTURECOUNT as c_int,
+                                ptr::addr_of(&count) as *c_void);
+        }
         assert count >= 0 as c_int;
         return count as uint;
     }
 
     fn info_name_count() -> uint {
         let count = -1 as c_int;
-        pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
-                            PCRE_INFO_NAMECOUNT as c_int,
-                            ptr::addr_of(&count) as *c_void);
+        unsafe {
+            pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
+                                PCRE_INFO_NAMECOUNT as c_int,
+                                ptr::addr_of(&count) as *c_void);
+        }
         assert count >= 0 as c_int;
         return count as uint;
     }
 
     fn info_name_entry_size() -> uint {
         let size = -1 as c_int;
-        pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
-                            PCRE_INFO_NAMEENTRYSIZE as c_int,
-                            ptr::addr_of(&size) as *c_void);
+        unsafe {
+            pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
+                                PCRE_INFO_NAMEENTRYSIZE as c_int,
+                                ptr::addr_of(&size) as *c_void);
+        }
         assert size >= 0 as c_int;
         return size as uint;
     }
@@ -359,9 +365,11 @@ impl Match: MatchExtensions {
     }
 
     fn named_group(name: &str) -> Option<@~str> {
-        let i = str::as_buf(name, |s, _n| {
-            pcre::pcre_get_stringnumber(self.pattern._pcre_res.p, s as *c_char)
-        });
+        let i =  unsafe {
+            str::as_buf(name, |s, _n| {
+                pcre::pcre_get_stringnumber(self.pattern._pcre_res.p, s as *c_char)
+            })
+        };
         if i <= 0 as c_int { return None; }
         return self.group(i as uint);
     }
@@ -408,11 +416,11 @@ pub fn compile(pattern: &str, options: int) -> CompileResult {
                                 ptr::addr_of(&errreason),
                                 ptr::addr_of(&erroffset),
                                 ptr::null())
-        });
+        })
     };
     if p == ptr::null() {
         return Err({code: errcode as int,
-                    reason: @str::raw::from_c_str(errreason),
+                    reason: unsafe { @str::raw::from_c_str(errreason) },
                     offset: erroffset as uint});
     }
     return Ok({str: @str::from_slice(pattern), _pcre_res: @PcreRes {p: p}});
@@ -438,13 +446,13 @@ pub fn exec(pattern: Pattern,
                             offset as c_int, options as c_int,
                             vec::raw::to_ptr(ovec) as *c_int,
                             count * (3 as c_int)) as int
-        });
+        })
     };
 
     if ret_code < 0 { return Err(ret_code as ExecErr); }
 
     // Cut off the working space
-    vec::raw::set_len(&mut ovec, count as uint * 2u);
+    unsafe { vec::raw::set_len(&mut ovec, count as uint * 2u) }
 
     let mut captures: ~[uint] = ~[];
     vec::reserve(&mut captures, vec::len(ovec));
