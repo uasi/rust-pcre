@@ -220,16 +220,16 @@ extern mod pcre {
 }
 
 pub trait PatternUtil {
-    fn info_capture_count() -> uint;
-    fn info_name_count() -> uint;
-    fn info_name_entry_size() -> uint;
-    fn with_name_table(blk: fn(*u8));
-    fn group_count() -> uint;
-    fn group_names() -> ~[~str];
+    fn info_capture_count(self) -> uint;
+    fn info_name_count(self) -> uint;
+    fn info_name_entry_size(self) -> uint;
+    fn with_name_table(self, blk: fn(*u8));
+    fn group_count(self) -> uint;
+    fn group_names(self) -> ~[~str];
 }
 
 impl Pattern: PatternUtil {
-    fn info_capture_count() -> uint {
+    fn info_capture_count(self) -> uint {
         let count = -1 as c_int;
         unsafe {
             pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
@@ -240,7 +240,7 @@ impl Pattern: PatternUtil {
         return count as uint;
     }
 
-    fn info_name_count() -> uint {
+    fn info_name_count(self) -> uint {
         let count = -1 as c_int;
         unsafe {
             pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
@@ -251,7 +251,7 @@ impl Pattern: PatternUtil {
         return count as uint;
     }
 
-    fn info_name_entry_size() -> uint {
+    fn info_name_entry_size(self) -> uint {
         let size = -1 as c_int;
         unsafe {
             pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
@@ -262,7 +262,7 @@ impl Pattern: PatternUtil {
         return size as uint;
     }
 
-    fn with_name_table(blk: fn(*u8)) {
+    fn with_name_table(self, blk: fn(*u8)) {
         let table = ptr::null::<u8>();
         unsafe {
             pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
@@ -273,11 +273,11 @@ impl Pattern: PatternUtil {
         blk(table);
     }
 
-    fn group_count() -> uint {
+    fn group_count(self) -> uint {
         return self.info_capture_count();
     }
 
-    fn group_names() -> ~[~str] {
+    fn group_names(self) -> ~[~str] {
         let count = self.info_name_count();
         if count == 0u { return ~[]; }
         let size = self.info_name_entry_size();
@@ -296,66 +296,66 @@ impl Pattern: PatternUtil {
 }
 
 pub trait PatternLike {
-    fn compile(options: int) -> CompileResult;
+    fn compile(self, options: int) -> CompileResult;
 }
 
 impl &str: PatternLike {
-    fn compile(options: int) -> CompileResult { compile(self, options) }
+    fn compile(self, options: int) -> CompileResult { compile(self, options) }
 }
 
 impl ~str: PatternLike {
-    fn compile(options: int) -> CompileResult { compile(self, options) }
+    fn compile(self, options: int) -> CompileResult { compile(self, options) }
 }
 
 impl @str: PatternLike {
-    fn compile(options: int) -> CompileResult { compile(self, options) }
+    fn compile(self, options: int) -> CompileResult { compile(self, options) }
 }
 
 impl Pattern: PatternLike {
-    fn compile(_options: int) -> CompileResult { Ok(self) }
+    fn compile(self, _options: int) -> CompileResult { Ok(self) }
 }
 
 impl CompileResult: PatternLike {
-    fn compile(_options: int) -> CompileResult { self }
+    fn compile(self, _options: int) -> CompileResult { self }
 }
 
 pub trait MatchExtensions {
-    fn matched() -> ~str;
-    fn prematch() -> ~str;
-    fn postmatch() -> ~str;
-    fn begin() -> uint;
-    fn end() -> uint;
-    fn group(i: uint) -> Option<@~str>;
-    fn named_group(name: &str) -> Option<@~str>;
-    fn subgroups() -> ~[~str];
-    fn subgroups_iter(blk: fn(&str));
-    fn group_count() -> uint;
-    fn group_names() -> ~[~str];
+    fn matched(self) -> ~str;
+    fn prematch(self) -> ~str;
+    fn postmatch(self) -> ~str;
+    fn begin(self) -> uint;
+    fn end(self) -> uint;
+    fn group(self, i: uint) -> Option<@~str>;
+    fn named_group(self, name: &str) -> Option<@~str>;
+    fn subgroups(self) -> ~[~str];
+    fn subgroups_iter(self, blk: fn(&str));
+    fn group_count(self) -> uint;
+    fn group_names(self) -> ~[~str];
 }
 
 impl Match: MatchExtensions {
-    fn matched() -> ~str {
+    fn matched(self) -> ~str {
         return str::slice(*self.subject, self.begin(), self.end());
     }
 
-    fn prematch() -> ~str {
+    fn prematch(self) -> ~str {
         return str::slice(*self.subject, 0u, self.begin());
     }
 
-    fn postmatch() -> ~str {
+    fn postmatch(self) -> ~str {
         return str::slice(*self.subject ,self.end(),
                           str::char_len(*self.subject));
     }
 
-    fn begin() -> uint {
+    fn begin(self) -> uint {
         return self._captures[0];
     }
 
-    fn end() -> uint {
+    fn end(self) -> uint {
         return self._captures[1];
     }
 
-    fn group(i: uint) -> Option<@~str> {
+    fn group(self, i: uint) -> Option<@~str> {
         if i > self.group_count() {
             return None;
         }
@@ -364,7 +364,7 @@ impl Match: MatchExtensions {
                                 self._captures[i * 2u + 1u]));
     }
 
-    fn named_group(name: &str) -> Option<@~str> {
+    fn named_group(self, name: &str) -> Option<@~str> {
         let i =  unsafe {
             str::as_buf(name, |s, _n| {
                 pcre::pcre_get_stringnumber(self.pattern._pcre_res.p, s as *c_char)
@@ -374,14 +374,14 @@ impl Match: MatchExtensions {
         return self.group(i as uint);
     }
 
-    fn subgroups() -> ~[~str] {
+    fn subgroups(self) -> ~[~str] {
         let mut v = ~[];
         vec::reserve(&mut v, self.group_count());
         do self.subgroups_iter |subgroup| { vec::push(&mut v, str::from_slice(subgroup)); }
         return v;
     }
 
-    fn subgroups_iter(blk: fn(&str)) {
+    fn subgroups_iter(self, blk: fn(&str)) {
         for uint::range(1u, self.group_count() + 1u) |i| {
             match self.group(i) {
               Some(s) => blk(*s),
@@ -390,11 +390,11 @@ impl Match: MatchExtensions {
         }
     }
 
-    fn group_count() -> uint {
+    fn group_count(self) -> uint {
         return vec::len(*self._captures) / 2u - 1u;
     }
 
-    fn group_names() -> ~[~str] {
+    fn group_names(self) -> ~[~str] {
         return self.pattern.group_names();
     }
 }
