@@ -385,7 +385,7 @@ impl Match: MatchExtensions {
         for uint::range(1u, self.group_count() + 1u) |i| {
             match self.group(i) {
               Some(s) => blk(*s),
-              None => fail,
+              None => die!(),
             }
         }
     }
@@ -734,7 +734,7 @@ mod test {
                 assert e.reason == @~"missing )";
                 assert e.offset == 4u;
             }
-            _ => { fail; }
+            _ => { die!(); }
         }
 
         let r = search("(foo)bar", "baz", 0);
