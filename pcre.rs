@@ -393,7 +393,7 @@ impl Match: MatchExtensions {
 
 pub fn compile(pattern: &str, options: int) -> CompileResult unsafe {
     if options | COMPILE_OPTIONS != COMPILE_OPTIONS {
-        #warn("unrecognized option bit(s) are set");
+        warn!("unrecognized option bit(s) are set");
     }
 
     let options = options | PCRE_NO_UTF8_CHECK; // str is always valid
@@ -421,7 +421,7 @@ pub fn exec(pattern: Pattern,
         options: int) -> ExecResult unsafe {
 
     if (options | EXEC_OPTIONS) != EXEC_OPTIONS {
-        #warn("unrecognized option bit(s) are set");
+        warn!("unrecognized option bit(s) are set");
     }
 
     let options = options | PCRE_NO_UTF8_CHECK; // str is always valid
