@@ -296,27 +296,27 @@ impl Pattern: PatternUtil {
 }
 
 pub trait PatternLike {
-    fn compile(self, options: int) -> CompileResult;
+    fn compile(&self, options: int) -> CompileResult;
 }
 
 impl &str: PatternLike {
-    fn compile(self, options: int) -> CompileResult { compile(self, options) }
+    fn compile(&self, options: int) -> CompileResult { compile(*self, options) }
 }
 
 impl ~str: PatternLike {
-    fn compile(self, options: int) -> CompileResult { compile(self, options) }
+    fn compile(&self, options: int) -> CompileResult { compile(*self, options) }
 }
 
 impl @str: PatternLike {
-    fn compile(self, options: int) -> CompileResult { compile(self, options) }
+    fn compile(&self, options: int) -> CompileResult { compile(*self, options) }
 }
 
 impl Pattern: PatternLike {
-    fn compile(self, _options: int) -> CompileResult { Ok(self) }
+    fn compile(&self, _options: int) -> CompileResult { Ok(*self) }
 }
 
 impl CompileResult: PatternLike {
-    fn compile(self, _options: int) -> CompileResult { self }
+    fn compile(&self, _options: int) -> CompileResult { *self }
 }
 
 pub trait MatchExtensions {
