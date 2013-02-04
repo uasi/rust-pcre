@@ -143,7 +143,7 @@ enum Pcre {}
 enum PcreExtra {}
 struct PcreRes {
     p: *Pcre,
-    drop { c::free(self.p as *c_void); }
+    drop { unsafe { c::free(self.p as *c_void); } }
 }
 
 #[doc = "
@@ -169,11 +169,11 @@ pub type ReplaceResult = Result<@~str, RegexErr>;
 #[doc = "
 The type that represents compile error.
 "]
-pub type CompileErr = {
+pub struct CompileErr {
     code: int,
     reason: @~str,
     offset: uint,
-};
+}
 
 #[doc = "
 The type that represents exec error.
@@ -188,16 +188,16 @@ pub enum RegexErr {
     ExecErr(ExecErr),
 }
 
-pub type Pattern = {
+pub struct Pattern {
     str: @~str,
     _pcre_res: @PcreRes,
-};
+}
 
-pub type Match = {
+pub struct Match {
     subject: @~str,
     pattern: Pattern,
     _captures: @~[uint],
-};
+}
 
 #[nolink]
 #[abi = "cdecl"]
@@ -220,43 +220,49 @@ extern mod pcre {
 }
 
 pub trait PatternUtil {
-    fn info_capture_count() -> uint;
-    fn info_name_count() -> uint;
-    fn info_name_entry_size() -> uint;
-    fn with_name_table(blk: fn(*u8));
-    fn group_count() -> uint;
-    fn group_names() -> ~[~str];
+    fn info_capture_count(self) -> uint;
+    fn info_name_count(self) -> uint;
+    fn info_name_entry_size(self) -> uint;
+    fn with_name_table(self, blk: fn(*u8));
+    fn group_count(self) -> uint;
+    fn group_names(self) -> ~[~str];
 }
 
 impl Pattern: PatternUtil {
-    fn info_capture_count() -> uint {
+    fn info_capture_count(self) -> uint {
         let count = -1 as c_int;
-        pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
-                            PCRE_INFO_CAPTURECOUNT as c_int,
-                            ptr::addr_of(&count) as *c_void);
+        unsafe {
+            pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
+                                PCRE_INFO_CAPTURECOUNT as c_int,
+                                ptr::addr_of(&count) as *c_void);
+        }
         assert count >= 0 as c_int;
         return count as uint;
     }
 
-    fn info_name_count() -> uint {
+    fn info_name_count(self) -> uint {
         let count = -1 as c_int;
-        pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
-                            PCRE_INFO_NAMECOUNT as c_int,
-                            ptr::addr_of(&count) as *c_void);
+        unsafe {
+            pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
+                                PCRE_INFO_NAMECOUNT as c_int,
+                                ptr::addr_of(&count) as *c_void);
+        }
         assert count >= 0 as c_int;
         return count as uint;
     }
 
-    fn info_name_entry_size() -> uint {
+    fn info_name_entry_size(self) -> uint {
         let size = -1 as c_int;
-        pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
-                            PCRE_INFO_NAMEENTRYSIZE as c_int,
-                            ptr::addr_of(&size) as *c_void);
+        unsafe {
+            pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
+                                PCRE_INFO_NAMEENTRYSIZE as c_int,
+                                ptr::addr_of(&size) as *c_void);
+        }
         assert size >= 0 as c_int;
         return size as uint;
     }
 
-    fn with_name_table(blk: fn(*u8)) {
+    fn with_name_table(self, blk: fn(*u8)) {
         let table = ptr::null::<u8>();
         unsafe {
             pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
@@ -267,11 +273,11 @@ impl Pattern: PatternUtil {
         blk(table);
     }
 
-    fn group_count() -> uint {
+    fn group_count(self) -> uint {
         return self.info_capture_count();
     }
 
-    fn group_names() -> ~[~str] {
+    fn group_names(self) -> ~[~str] {
         let count = self.info_name_count();
         if count == 0u { return ~[]; }
         let size = self.info_name_entry_size();
@@ -290,66 +296,66 @@ impl Pattern: PatternUtil {
 }
 
 pub trait PatternLike {
-    fn compile(options: int) -> CompileResult;
+    fn compile(&self, options: int) -> CompileResult;
 }
 
 impl &str: PatternLike {
-    fn compile(options: int) -> CompileResult { compile(self, options) }
+    fn compile(&self, options: int) -> CompileResult { compile(*self, options) }
 }
 
 impl ~str: PatternLike {
-    fn compile(options: int) -> CompileResult { compile(self, options) }
+    fn compile(&self, options: int) -> CompileResult { compile(*self, options) }
 }
 
 impl @str: PatternLike {
-    fn compile(options: int) -> CompileResult { compile(self, options) }
+    fn compile(&self, options: int) -> CompileResult { compile(*self, options) }
 }
 
 impl Pattern: PatternLike {
-    fn compile(_options: int) -> CompileResult { Ok(self) }
+    fn compile(&self, _options: int) -> CompileResult { Ok(*self) }
 }
 
 impl CompileResult: PatternLike {
-    fn compile(_options: int) -> CompileResult { self }
+    fn compile(&self, _options: int) -> CompileResult { *self }
 }
 
 pub trait MatchExtensions {
-    fn matched() -> ~str;
-    fn prematch() -> ~str;
-    fn postmatch() -> ~str;
-    fn begin() -> uint;
-    fn end() -> uint;
-    fn group(i: uint) -> Option<@~str>;
-    fn named_group(name: &str) -> Option<@~str>;
-    fn subgroups() -> ~[~str];
-    fn subgroups_iter(blk: fn(&str));
-    fn group_count() -> uint;
-    fn group_names() -> ~[~str];
+    fn matched(self) -> ~str;
+    fn prematch(self) -> ~str;
+    fn postmatch(self) -> ~str;
+    fn begin(self) -> uint;
+    fn end(self) -> uint;
+    fn group(self, i: uint) -> Option<@~str>;
+    fn named_group(self, name: &str) -> Option<@~str>;
+    fn subgroups(self) -> ~[~str];
+    fn subgroups_iter(self, blk: fn(&str));
+    fn group_count(self) -> uint;
+    fn group_names(self) -> ~[~str];
 }
 
 impl Match: MatchExtensions {
-    fn matched() -> ~str {
+    fn matched(self) -> ~str {
         return str::slice(*self.subject, self.begin(), self.end());
     }
 
-    fn prematch() -> ~str {
+    fn prematch(self) -> ~str {
         return str::slice(*self.subject, 0u, self.begin());
     }
 
-    fn postmatch() -> ~str {
+    fn postmatch(self) -> ~str {
         return str::slice(*self.subject ,self.end(),
                           str::char_len(*self.subject));
     }
 
-    fn begin() -> uint {
+    fn begin(self) -> uint {
         return self._captures[0];
     }
 
-    fn end() -> uint {
+    fn end(self) -> uint {
         return self._captures[1];
     }
 
-    fn group(i: uint) -> Option<@~str> {
+    fn group(self, i: uint) -> Option<@~str> {
         if i > self.group_count() {
             return None;
         }
@@ -358,70 +364,74 @@ impl Match: MatchExtensions {
                                 self._captures[i * 2u + 1u]));
     }
 
-    fn named_group(name: &str) -> Option<@~str> {
-        let i = str::as_buf(name, |s, _n| {
-            pcre::pcre_get_stringnumber(self.pattern._pcre_res.p, s as *c_char)
-        });
+    fn named_group(self, name: &str) -> Option<@~str> {
+        let i =  unsafe {
+            str::as_buf(name, |s, _n| {
+                pcre::pcre_get_stringnumber(self.pattern._pcre_res.p, s as *c_char)
+            })
+        };
         if i <= 0 as c_int { return None; }
         return self.group(i as uint);
     }
 
-    fn subgroups() -> ~[~str] {
+    fn subgroups(self) -> ~[~str] {
         let mut v = ~[];
         vec::reserve(&mut v, self.group_count());
         do self.subgroups_iter |subgroup| { vec::push(&mut v, str::from_slice(subgroup)); }
         return v;
     }
 
-    fn subgroups_iter(blk: fn(&str)) {
+    fn subgroups_iter(self, blk: fn(&str)) {
         for uint::range(1u, self.group_count() + 1u) |i| {
             match self.group(i) {
               Some(s) => blk(*s),
-              None => fail,
+              None => die!(),
             }
         }
     }
 
-    fn group_count() -> uint {
+    fn group_count(self) -> uint {
         return vec::len(*self._captures) / 2u - 1u;
     }
 
-    fn group_names() -> ~[~str] {
+    fn group_names(self) -> ~[~str] {
         return self.pattern.group_names();
     }
 }
 
-pub fn compile(pattern: &str, options: int) -> CompileResult unsafe {
+pub fn compile(pattern: &str, options: int) -> CompileResult {
     if options | COMPILE_OPTIONS != COMPILE_OPTIONS {
-        #warn("unrecognized option bit(s) are set");
+        warn!("unrecognized option bit(s) are set");
     }
 
     let options = options | PCRE_NO_UTF8_CHECK; // str is always valid
     let errcode = 0 as c_int;
     let errreason: *c_char = ptr::null();
     let erroffset = 0 as c_int;
-    let p = str::as_buf(pattern, |pat, _n| {
-        pcre::pcre_compile2(pat as *c_char,
-                            options as c_int,
-                            ptr::addr_of(&errcode),
-                            ptr::addr_of(&errreason),
-                            ptr::addr_of(&erroffset),
-                            ptr::null())
-    });
+    let p = unsafe {
+        str::as_buf(pattern, |pat, _n| {
+            pcre::pcre_compile2(pat as *c_char,
+                                options as c_int,
+                                ptr::addr_of(&errcode),
+                                ptr::addr_of(&errreason),
+                                ptr::addr_of(&erroffset),
+                                ptr::null())
+        })
+    };
     if p == ptr::null() {
-        return Err({code: errcode as int,
-                    reason: @str::raw::from_c_str(errreason),
-                    offset: erroffset as uint});
+        return Err(CompileErr {code: errcode as int,
+                               reason: unsafe { @str::raw::from_c_str(errreason) },
+                               offset: erroffset as uint});
     }
-    return Ok({str: @str::from_slice(pattern), _pcre_res: @PcreRes {p: p}});
+    return Ok(Pattern {str: @str::from_slice(pattern), _pcre_res: @PcreRes {p: p}});
 }
 
 pub fn exec(pattern: Pattern,
         subject: &str, offset: uint,
-        options: int) -> ExecResult unsafe {
+        options: int) -> ExecResult {
 
     if (options | EXEC_OPTIONS) != EXEC_OPTIONS {
-        #warn("unrecognized option bit(s) are set");
+        warn!("unrecognized option bit(s) are set");
     }
 
     let options = options | PCRE_NO_UTF8_CHECK; // str is always valid
@@ -429,18 +439,20 @@ pub fn exec(pattern: Pattern,
     let count = (pattern.info_capture_count() + 1u) as c_int;
     let mut ovec = vec::from_elem((count as uint) * 3u, 0u as c_int);
 
-    let ret_code = str::as_buf(subject, |s, _n| {
-        pcre::pcre_exec(pattern._pcre_res.p, ptr::null(),
-                        s as *c_char, str::len(subject) as c_int,
-                        offset as c_int, options as c_int,
-                        vec::raw::to_ptr(ovec) as *c_int,
-                        count * (3 as c_int)) as int
-    });
+    let ret_code = unsafe {
+        str::as_buf(subject, |s, _n| {
+            pcre::pcre_exec(pattern._pcre_res.p, ptr::null(),
+                            s as *c_char, str::len(subject) as c_int,
+                            offset as c_int, options as c_int,
+                            vec::raw::to_ptr(ovec) as *c_int,
+                            count * (3 as c_int)) as int
+        })
+    };
 
     if ret_code < 0 { return Err(ret_code as ExecErr); }
 
     // Cut off the working space
-    vec::raw::set_len(&mut ovec, count as uint * 2u);
+    unsafe { vec::raw::set_len(&mut ovec, count as uint * 2u) }
 
     let mut captures: ~[uint] = ~[];
     vec::reserve(&mut captures, vec::len(ovec));
@@ -450,7 +462,7 @@ pub fn exec(pattern: Pattern,
     }
     assert vec::len(captures) % 2u == 0u;
 
-    return Ok({subject: @str::from_slice(subject), pattern: pattern, _captures: @captures});
+    return Ok(Match {subject: @str::from_slice(subject), pattern: pattern, _captures: @captures});
 }
 
 pub fn search<T: PatternLike>(pattern: T, subject: &str,
@@ -678,7 +690,7 @@ mod test_util {
 
 
 #[cfg(test)]
-mod test {
+mod tests {
     use test_util::*;
 
     #[test]
@@ -722,7 +734,7 @@ mod test {
                 assert e.reason == @~"missing )";
                 assert e.offset == 4u;
             }
-            _ => { fail; }
+            _ => { die!(); }
         }
 
         let r = search("(foo)bar", "baz", 0);
