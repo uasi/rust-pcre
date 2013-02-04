@@ -1,3 +1,4 @@
-pcre
+test-pcre
 *.dSYM
 *.dylib
+*.so

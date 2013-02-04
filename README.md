@@ -9,7 +9,6 @@ SYNOPSIS
     extern mod std;
     extern mod pcre;
     use pcre::*;
-    use pcre::consts::*;
 
     fn main() {
         let s_result = search("b(..)", "FooBar", PCRE_CASELESS);

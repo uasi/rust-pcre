@@ -6,3 +6,8 @@
 #[comment = "A PCRE binding for Rust"];
 #[license = "MIT"];
 #[crate_type = "lib"];
+
+pub mod pcre;
+pub mod consts;
+
+pub use pcre::*;

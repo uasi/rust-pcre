@@ -6,9 +6,9 @@ all: build
 build: $(SOURCE)
 	$(RUSTC) --lib pcre.rc
 
-test: build
-	$(RUSTC) --test pcre.rs
-	./pcre
+test: clean build
+	$(RUSTC) -L . --test test-pcre.rs
+	./test-pcre
 
 clean:
-	rm -rf pcre pcre.dSYM libpcre-*
+	rm -rf test-pcre *.dSYM *.dylib *.so
