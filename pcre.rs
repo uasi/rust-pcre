@@ -58,13 +58,13 @@ pub enum RegexErr {
 
 pub struct Pattern {
     str: @~str,
-    _pcre_res: @PcreRes,
+    priv pcre_res: @PcreRes,
 }
 
 pub struct Match {
     subject: @~str,
     pattern: Pattern,
-    _captures: @~[uint],
+    priv captures: @~[uint],
 }
 
 #[nolink]
@@ -99,7 +99,7 @@ impl Pattern: PatternUtil {
     fn info_capture_count(self) -> uint {
         let count = -1 as c_int;
         unsafe {
-            pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
+            pcre::pcre_fullinfo(self.pcre_res.p, ptr::null(),
                                 PCRE_INFO_CAPTURECOUNT as c_int,
                                 ptr::addr_of(&count) as *c_void);
         }
@@ -110,7 +110,7 @@ impl Pattern: PatternUtil {
     fn info_name_count(self) -> uint {
         let count = -1 as c_int;
         unsafe {
-            pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
+            pcre::pcre_fullinfo(self.pcre_res.p, ptr::null(),
                                 PCRE_INFO_NAMECOUNT as c_int,
                                 ptr::addr_of(&count) as *c_void);
         }
@@ -121,7 +121,7 @@ impl Pattern: PatternUtil {
     fn info_name_entry_size(self) -> uint {
         let size = -1 as c_int;
         unsafe {
-            pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
+            pcre::pcre_fullinfo(self.pcre_res.p, ptr::null(),
                                 PCRE_INFO_NAMEENTRYSIZE as c_int,
                                 ptr::addr_of(&size) as *c_void);
         }
@@ -132,7 +132,7 @@ impl Pattern: PatternUtil {
     fn with_name_table(self, blk: fn(*u8)) {
         let table = ptr::null::<u8>();
         unsafe {
-            pcre::pcre_fullinfo(self._pcre_res.p, ptr::null(),
+            pcre::pcre_fullinfo(self.pcre_res.p, ptr::null(),
                                 PCRE_INFO_NAMETABLE as c_int,
                                 ptr::addr_of(&table) as *c_void);
         }
@@ -215,11 +215,11 @@ impl Match: MatchExtensions {
     }
 
     fn begin(self) -> uint {
-        return self._captures[0];
+        return self.captures[0];
     }
 
     fn end(self) -> uint {
-        return self._captures[1];
+        return self.captures[1];
     }
 
     fn group(self, i: uint) -> Option<@~str> {
@@ -227,14 +227,14 @@ impl Match: MatchExtensions {
             return None;
         }
         return Some(@str::slice(*self.subject,
-                                self._captures[i * 2u],
-                                self._captures[i * 2u + 1u]));
+                                self.captures[i * 2u],
+                                self.captures[i * 2u + 1u]));
     }
 
     fn named_group(self, name: &str) -> Option<@~str> {
         let i =  unsafe {
             str::as_buf(name, |s, _n| {
-                pcre::pcre_get_stringnumber(self.pattern._pcre_res.p, s as *c_char)
+                pcre::pcre_get_stringnumber(self.pattern.pcre_res.p, s as *c_char)
             })
         };
         if i <= 0 as c_int { return None; }
@@ -258,7 +258,7 @@ impl Match: MatchExtensions {
     }
 
     fn group_count(self) -> uint {
-        return vec::len(*self._captures) / 2u - 1u;
+        return vec::len(*self.captures) / 2u - 1u;
     }
 
     fn group_names(self) -> ~[~str] {
@@ -290,7 +290,7 @@ pub fn compile(pattern: &str, options: int) -> CompileResult {
                                reason: unsafe { @str::raw::from_c_str(errreason) },
                                offset: erroffset as uint});
     }
-    return Ok(Pattern {str: @str::from_slice(pattern), _pcre_res: @PcreRes {p: p}});
+    return Ok(Pattern {str: @str::from_slice(pattern), pcre_res: @PcreRes {p: p}});
 }
 
 pub fn exec(pattern: Pattern,
@@ -308,7 +308,7 @@ pub fn exec(pattern: Pattern,
 
     let ret_code = unsafe {
         str::as_buf(subject, |s, _n| {
-            pcre::pcre_exec(pattern._pcre_res.p, ptr::null(),
+            pcre::pcre_exec(pattern.pcre_res.p, ptr::null(),
                             s as *c_char, str::len(subject) as c_int,
                             offset as c_int, options as c_int,
                             vec::raw::to_ptr(ovec) as *c_int,
@@ -329,7 +329,7 @@ pub fn exec(pattern: Pattern,
     }
     assert vec::len(captures) % 2u == 0u;
 
-    return Ok(Match {subject: @str::from_slice(subject), pattern: pattern, _captures: @captures});
+    return Ok(Match {subject: @str::from_slice(subject), pattern: pattern, captures: @captures});
 }
 
 pub fn search<T: PatternLike>(pattern: T, subject: &str,
