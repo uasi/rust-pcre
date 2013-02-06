@@ -14,53 +14,43 @@ struct PcreRes {
     drop { unsafe { c::free(self.p as *c_void); } }
 }
 
-#[doc = "
-The result type of <compile>.
-"]
+
+/// The result type of `compile`
 pub type CompileResult = Result<Pattern, CompileErr>;
 
-#[doc = "
-The result type of <exec>.
-"]
+/// The result type of `exec`
 pub type ExecResult = Result<Match, ExecErr>;
 
-#[doc = "
-The result type of <search>.
-"]
+
+/// The result type of `search`
 pub type SearchResult = Result<Match, RegexErr>;
 
-#[doc = "
-The result type of <replace>.
-"]
+// The result type of `replace`
 pub type ReplaceResult = Result<@~str, RegexErr>;
 
-#[doc = "
-The type that represents compile error.
-"]
+/// The type that represents compile error
 pub struct CompileErr {
     code: int,
     reason: @~str,
     offset: uint,
 }
 
-#[doc = "
-The type that represents exec error.
-"]
+/// The type that represents exec error
 pub type ExecErr = int;
 
-#[doc = "
-Either compile or exec error.
-"]
+/// Either compile or exec error
 pub enum RegexErr {
     CompileErr(CompileErr),
     ExecErr(ExecErr),
 }
 
+/// Compiled regular expression
 pub struct Pattern {
     str: @~str,
     priv pcre_res: @PcreRes,
 }
 
+/// Match
 pub struct Match {
     subject: @~str,
     pattern: Pattern,
@@ -452,9 +442,7 @@ pub fn fmt_compile_err(e: CompileErr) -> ~str {
 }
 
 
-#[doc = "
-Returns true iff sr indicates that the subject did not match the pattern.
-"]
+/// Return true iff `sr` indicates that the subject did not match the pattern
 pub pure fn is_nomatch(sr: SearchResult) -> bool {
     match sr {
       Err(ExecErr(e)) if e == PCRE_ERROR_NOMATCH => true,
