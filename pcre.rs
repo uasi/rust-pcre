@@ -54,7 +54,7 @@ pub struct Pattern {
 pub struct Match {
     subject: @~str,
     pattern: Pattern,
-    priv captures: @~[uint],
+    priv captures: @~[int],
 }
 
 #[nolink]
@@ -205,20 +205,23 @@ impl Match: MatchExtensions {
     }
 
     fn begin(self) -> uint {
-        return self.captures[0];
+        return self.captures[0] as uint;
     }
 
     fn end(self) -> uint {
-        return self.captures[1];
+        return self.captures[1] as uint;
     }
 
     fn group(self, i: uint) -> Option<@~str> {
         if i > self.group_count() {
             return None;
         }
-        return Some(@str::slice(*self.subject,
-                                self.captures[i * 2u],
-                                self.captures[i * 2u + 1u]));
+        let i1 = self.captures[i * 2u];
+        let i2 = self.captures[i * 2u + 1u];
+        if(i1 < 0 || i2 < 0) {
+            return None;
+        }
+        return Some(@str::slice(*self.subject, i1 as uint, i2 as uint));
     }
 
     fn named_group(self, name: &str) -> Option<@~str> {
@@ -311,11 +314,11 @@ pub fn exec(pattern: Pattern,
     // Cut off the working space
     unsafe { vec::raw::set_len(&mut ovec, count as uint * 2u) }
 
-    let mut captures: ~[uint] = ~[];
+    let mut captures: ~[int] = ~[];
     vec::reserve(&mut captures, vec::len(ovec));
     for ovec.each |o| {
-        if *o as int < 0 { loop; }
-        vec::push(&mut captures, *o as uint);
+        if (*o as int) < 0 { loop; }
+        vec::push(&mut captures, *o as int);
     }
     assert vec::len(captures) % 2u == 0u;
 
