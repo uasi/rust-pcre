@@ -317,7 +317,6 @@ pub fn exec(pattern: Pattern,
     let mut captures: ~[int] = ~[];
     vec::reserve(&mut captures, vec::len(ovec));
     for ovec.each |o| {
-        if (*o as int) < 0 { loop; }
         vec::push(&mut captures, *o as int);
     }
     assert vec::len(captures) % 2u == 0u;
