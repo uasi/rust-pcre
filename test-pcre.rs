@@ -99,6 +99,7 @@ mod test_util {
 #[cfg(test)]
 mod tests {
     use test_util::*;
+    use pcre::*;
 
     #[test]
     fn test_compile() {
@@ -238,6 +239,7 @@ mod tests {
 #[cfg(test)]
 mod test_match_extensions {
     use test_util::*;
+    use pcre::*;
 
     #[test]
     fn test_group() {
@@ -274,7 +276,32 @@ mod test_match_extensions {
         assert r.is_ok_and(|m| m.group_count() == 1u);
 
         let r = search("(?:foo|(baz))bar", "foobar", 0);
-        assert r.is_ok_and(|m| m.group_count() == 0u);
+        assert r.is_ok_and(|m| m.group_count() == 1u);
+    }
+
+    #[test]
+    fn test_unmatched_group() {
+        let r = search("((foo)|bar)_(baz)", "bar_baz", 0);
+        assert do r.is_ok_and |m| {
+            assert m.group(1u).is_some_and(|s| s == @~"bar");
+            assert m.group(2u).is_none();
+            assert m.group(3u).is_some_and(|s| s == @~"baz");
+            true
+        };
+
+        let r = search("(foo)?(bar)(baz)", "barbaz", 0);
+        assert do r.is_ok_and |m| {
+            assert m.group(1u).is_none();
+            assert m.group(2u).is_some_and(|s| s == @~"bar");
+            assert m.group(3u).is_some_and(|s| s == @~"baz");
+            true
+        };
+
+        let r = search("(foo)?(?<bar_name>bar)", "bar", 0);
+        assert do r.is_ok_and |m| {
+            assert m.named_group("bar_name").is_some_and(|s| s == @~"bar");
+            true
+        };
     }
 
     #[test]
