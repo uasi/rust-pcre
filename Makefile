@@ -1,13 +1,14 @@
 RUSTC := rustc
+RUSTC_OPTS :=
 SOURCE := pcre.rc pcre.rs
 
 all: build
 
 build: $(SOURCE)
-	$(RUSTC) --lib pcre.rc
+	$(RUSTC) $(RUSTC_OPTS) --lib pcre.rc
 
 test: clean build
-	$(RUSTC) -L . --test test-pcre.rs
+	$(RUSTC) $(RUSTC_OPTS) -L . --test test-pcre.rs
 	./test-pcre
 
 clean:
