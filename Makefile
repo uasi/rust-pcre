@@ -1,6 +1,6 @@
 RUSTC := rustc
 RUSTC_OPTS :=
-SOURCE := pcre.rc pcre.rs
+SOURCE := pcre.rc pcre.rs consts.rs
 
 all: build
 
