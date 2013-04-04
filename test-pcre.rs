@@ -142,7 +142,7 @@ mod tests {
                 assert!(e.reason == @~"missing )");
                 assert!(e.offset == 4u);
             }
-            _ => { die!(); }
+            _ => { fail!(); }
         }
 
         let r = search("(foo)bar", "baz", 0);

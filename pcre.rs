@@ -260,7 +260,7 @@ impl MatchExtensions for Match {
         for uint::range(1u, self.group_count() + 1u) |i| {
             match self.group(i) {
               Some(s) => blk(*s),
-              None => die!(),
+              None => fail!(),
             }
         }
     }
