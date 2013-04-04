@@ -26,7 +26,7 @@ fn basic_usage() {
                              match_obj.matched(),
                              match_obj.group(1)));
         }
-        Err(regex_err) => match (regex_err) {
+        Err(regex_err) => match regex_err {
             CompileErr(comp_err) => {
                 io::println(fmt!("compile failed: %s",
                                  fmt_compile_err(comp_err)));
@@ -77,7 +77,7 @@ fn replace_fns() {
 
     let _ = replace(pat, subj, repl, opts);
     let _ = replace_from(pat, subj, repl, offset, opts);
-    let _ = replace_fn(pat, subj, |match_obj| { repl });
+    let _ = replace_fn(pat, subj, |match_obj| { repl }, opts);
     let _ = replace_fn_from(pat, subj, |match_obj| { repl }, offset, opts);
     // And replace_all_*() variants.
 }
