@@ -80,7 +80,7 @@ pub trait PatternUtil {
     fn info_capture_count(self) -> uint;
     fn info_name_count(self) -> uint;
     fn info_name_entry_size(self) -> uint;
-    fn with_name_table(self, blk: fn(*u8));
+    fn with_name_table(self, blk: &fn(*u8));
     fn group_count(self) -> uint;
     fn group_names(self) -> ~[~str];
 }
@@ -119,7 +119,7 @@ impl Pattern: PatternUtil {
         return size as uint;
     }
 
-    fn with_name_table(self, blk: fn(*u8)) {
+    fn with_name_table(self, blk: &fn(*u8)) {
         let table = ptr::null::<u8>();
         unsafe {
             pcre::pcre_fullinfo(self.pcre_res.p, ptr::null(),
@@ -195,7 +195,7 @@ pub trait MatchExtensions {
     fn group(self, i: uint) -> Option<@~str>;
     fn named_group(self, name: &str) -> Option<@~str>;
     fn subgroups(self) -> ~[~str];
-    fn subgroups_iter(self, blk: fn(&str));
+    fn subgroups_iter(self, blk: &fn(&str));
     fn group_count(self) -> uint;
     fn group_names(self) -> ~[~str];
 }
@@ -256,7 +256,7 @@ impl Match: MatchExtensions {
         return v;
     }
 
-    fn subgroups_iter(self, blk: fn(&str)) {
+    fn subgroups_iter(self, blk: &fn(&str)) {
         for uint::range(1u, self.group_count() + 1u) |i| {
             match self.group(i) {
               Some(s) => blk(*s),
@@ -392,14 +392,14 @@ pub fn replace_from<T: PatternLike Copy>(pattern: T, subject: &str,
 }
 
 pub fn replace_fn<T: PatternLike Copy>(pattern: T, subject: &str,
-                                       repl_fn: fn(Match) -> ~str,
+                                       repl_fn: &fn(Match) -> ~str,
                                        options: int)
                                        -> ReplaceResult {
     return replace_fn_from(pattern, subject, repl_fn, 0u, options);
 }
 
 pub fn replace_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
-                                            repl_fn: fn(Match) -> ~str,
+                                            repl_fn: &fn(Match) -> ~str,
                                             offset: uint,
                                             options: int)
                                             -> ReplaceResult {
@@ -421,7 +421,7 @@ pub fn replace_all<T: PatternLike Copy>(pattern: T, subject: &str,
 }
 
 pub fn replace_all_fn<T: PatternLike Copy>(pattern: T, subject: &str,
-                                           repl_fn: fn(Match) -> ~str,
+                                           repl_fn: &fn(Match) -> ~str,
                                            options: int)
                                            -> ReplaceResult {
     return replace_all_fn_from(pattern, subject, repl_fn, 0u, options);
@@ -437,7 +437,7 @@ pub fn replace_all_from<T: PatternLike Copy>(pattern: T, subject: &str,
 }
 
 pub fn replace_all_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
-                                                repl_fn: fn(Match) -> ~str,
+                                                repl_fn: &fn(Match) -> ~str,
                                                 offset: uint,
                                                 options: int)
                                                 -> ReplaceResult {
