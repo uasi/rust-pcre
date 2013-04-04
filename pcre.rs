@@ -155,7 +155,7 @@ pub trait PatternLike {
     fn compile(&self, options: int) -> CompileResult;
 }
 
-impl PatternLike for &str {
+impl<'self> PatternLike for &'self str {
     fn compile(&self, options: int) -> CompileResult {
         compile(*self, options)
     }
