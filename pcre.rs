@@ -77,16 +77,16 @@ extern mod pcre {
 }
 
 pub trait PatternUtil {
-    pure fn info_capture_count(self) -> uint;
-    pure fn info_name_count(self) -> uint;
-    pure fn info_name_entry_size(self) -> uint;
+    fn info_capture_count(self) -> uint;
+    fn info_name_count(self) -> uint;
+    fn info_name_entry_size(self) -> uint;
     fn with_name_table(self, blk: fn(*u8));
-    pure fn group_count(self) -> uint;
-    pure fn group_names(self) -> ~[~str];
+    fn group_count(self) -> uint;
+    fn group_names(self) -> ~[~str];
 }
 
 impl Pattern: PatternUtil {
-    pure fn info_capture_count(self) -> uint {
+    fn info_capture_count(self) -> uint {
         let count = -1 as c_int;
         unsafe {
             pcre::pcre_fullinfo(self.pcre_res.p, ptr::null(),
@@ -97,7 +97,7 @@ impl Pattern: PatternUtil {
         return count as uint;
     }
 
-    pure fn info_name_count(self) -> uint {
+    fn info_name_count(self) -> uint {
         let count = -1 as c_int;
         unsafe {
             pcre::pcre_fullinfo(self.pcre_res.p, ptr::null(),
@@ -108,7 +108,7 @@ impl Pattern: PatternUtil {
         return count as uint;
     }
 
-    pure fn info_name_entry_size(self) -> uint {
+    fn info_name_entry_size(self) -> uint {
         let size = -1 as c_int;
         unsafe {
             pcre::pcre_fullinfo(self.pcre_res.p, ptr::null(),
@@ -130,11 +130,11 @@ impl Pattern: PatternUtil {
         blk(table);
     }
 
-    pure fn group_count(self) -> uint {
+    fn group_count(self) -> uint {
         return self.info_capture_count();
     }
 
-    pure fn group_names(self) -> ~[~str] {
+    fn group_names(self) -> ~[~str] {
         let count = self.info_name_count();
         if count == 0u { return ~[]; }
         let size = self.info_name_entry_size();
@@ -153,76 +153,76 @@ impl Pattern: PatternUtil {
 }
 
 pub trait PatternLike {
-    pure fn compile(&self, options: int) -> CompileResult;
+    fn compile(&self, options: int) -> CompileResult;
 }
 
 impl &str: PatternLike {
-    pure fn compile(&self, options: int) -> CompileResult {
+    fn compile(&self, options: int) -> CompileResult {
         compile(*self, options)
     }
 }
 
 impl ~str: PatternLike {
-    pure fn compile(&self, options: int) -> CompileResult {
+    fn compile(&self, options: int) -> CompileResult {
         compile(*self, options)
     }
 }
 
 impl @str: PatternLike {
-    pure fn compile(&self, options: int) -> CompileResult {
+    fn compile(&self, options: int) -> CompileResult {
         compile(*self, options)
     }
 }
 
 impl Pattern: PatternLike {
-    pure fn compile(&self, _options: int) -> CompileResult {
+    fn compile(&self, _options: int) -> CompileResult {
         Ok(*self)
     }
 }
 
 impl CompileResult: PatternLike {
-    pure fn compile(&self, _options: int) -> CompileResult {
+    fn compile(&self, _options: int) -> CompileResult {
         *self
     }
 }
 
 pub trait MatchExtensions {
-    pure fn matched(self) -> ~str;
-    pure fn prematch(self) -> ~str;
-    pure fn postmatch(self) -> ~str;
-    pure fn begin(self) -> uint;
-    pure fn end(self) -> uint;
-    pure fn group(self, i: uint) -> Option<@~str>;
-    pure fn named_group(self, name: &str) -> Option<@~str>;
-    pure fn subgroups(self) -> ~[~str];
+    fn matched(self) -> ~str;
+    fn prematch(self) -> ~str;
+    fn postmatch(self) -> ~str;
+    fn begin(self) -> uint;
+    fn end(self) -> uint;
+    fn group(self, i: uint) -> Option<@~str>;
+    fn named_group(self, name: &str) -> Option<@~str>;
+    fn subgroups(self) -> ~[~str];
     fn subgroups_iter(self, blk: fn(&str));
-    pure fn group_count(self) -> uint;
-    pure fn group_names(self) -> ~[~str];
+    fn group_count(self) -> uint;
+    fn group_names(self) -> ~[~str];
 }
 
 impl Match: MatchExtensions {
-    pure fn matched(self) -> ~str {
+    fn matched(self) -> ~str {
         return str::slice(*self.subject, self.begin(), self.end());
     }
 
-    pure fn prematch(self) -> ~str {
+    fn prematch(self) -> ~str {
         return str::slice(*self.subject, 0u, self.begin());
     }
 
-    pure fn postmatch(self) -> ~str {
+    fn postmatch(self) -> ~str {
         return str::slice(*self.subject ,self.end(),
                           str::char_len(*self.subject));
     }
 
-    pure fn begin(self) -> uint {
+    fn begin(self) -> uint {
         return self.captures[0] as uint;
     }
 
-    pure fn end(self) -> uint {
+    fn end(self) -> uint {
         return self.captures[1] as uint;
     }
 
-    pure fn group(self, i: uint) -> Option<@~str> {
+    fn group(self, i: uint) -> Option<@~str> {
         if i > self.group_count() {
             return None;
         }
@@ -234,7 +234,7 @@ impl Match: MatchExtensions {
         return Some(@str::slice(*self.subject, i1 as uint, i2 as uint));
     }
 
-    pure fn named_group(self, name: &str) -> Option<@~str> {
+    fn named_group(self, name: &str) -> Option<@~str> {
         let i =  unsafe {
             str::as_buf(name, |s, _n| {
                 pcre::pcre_get_stringnumber(self.pattern.pcre_res.p,
@@ -245,7 +245,7 @@ impl Match: MatchExtensions {
         return self.group(i as uint);
     }
 
-    pure fn subgroups(self) -> ~[~str] {
+    fn subgroups(self) -> ~[~str] {
         let mut v = ~[];
         unsafe {
             vec::reserve(&mut v, self.group_count());
@@ -265,16 +265,16 @@ impl Match: MatchExtensions {
         }
     }
 
-    pure fn group_count(self) -> uint {
+    fn group_count(self) -> uint {
         return vec::len(*self.captures) / 2u - 1u;
     }
 
-    pure fn group_names(self) -> ~[~str] {
+    fn group_names(self) -> ~[~str] {
         return self.pattern.group_names();
     }
 }
 
-pub pure fn compile(pattern: &str, options: int) -> CompileResult {
+pub fn compile(pattern: &str, options: int) -> CompileResult {
     if options | COMPILE_OPTIONS != COMPILE_OPTIONS {
         warn!("unrecognized option bit(s) are set");
     }
@@ -303,9 +303,9 @@ pub pure fn compile(pattern: &str, options: int) -> CompileResult {
                        pcre_res: @PcreRes {p: p}});
 }
 
-pub pure fn exec(pattern: Pattern,
-                 subject: &str, offset: uint,
-                 options: int) -> ExecResult {
+pub fn exec(pattern: Pattern,
+            subject: &str, offset: uint,
+            options: int) -> ExecResult {
 
     if (options | EXEC_OPTIONS) != EXEC_OPTIONS {
         warn!("unrecognized option bit(s) are set");
@@ -343,15 +343,15 @@ pub pure fn exec(pattern: Pattern,
                      captures: @captures});
 }
 
-pub pure fn search<T: PatternLike>(pattern: T, subject: &str,
-                                   options: int)
-                                   -> SearchResult {
+pub fn search<T: PatternLike>(pattern: T, subject: &str,
+                              options: int)
+                              -> SearchResult {
     return search_from(pattern, subject, 0u, options);
 }
 
-pub pure fn search_from<T: PatternLike>(pattern: T, subject: &str,
-                                        offset: uint, options: int)
-                                        -> SearchResult {
+pub fn search_from<T: PatternLike>(pattern: T, subject: &str,
+                                   offset: uint, options: int)
+                                   -> SearchResult {
     assert offset <= str::len(subject);
 
     let c_opts = options & COMPILE_OPTIONS;
@@ -376,29 +376,29 @@ pub pure fn search_from<T: PatternLike>(pattern: T, subject: &str,
     }
 }
 
-pub pure fn replace<T: PatternLike Copy>(pattern: T, subject: &str,
-                                         repl: &str, options: int)
-                                         -> ReplaceResult {
+pub fn replace<T: PatternLike Copy>(pattern: T, subject: &str,
+                                    repl: &str, options: int)
+                                    -> ReplaceResult {
     return replace_fn_from(pattern, subject,
                            |_m| { str::from_slice(repl) }, 0u, options);
 }
 
-pub pure fn replace_from<T: PatternLike Copy>(pattern: T, subject: &str,
-                                              repl: &str,  offset: uint,
-                                              options: int)
-                                              -> ReplaceResult {
+pub fn replace_from<T: PatternLike Copy>(pattern: T, subject: &str,
+                                         repl: &str,  offset: uint,
+                                         options: int)
+                                         -> ReplaceResult {
     return replace_fn_from(pattern, subject,
                            |_m| { str::from_slice(repl) }, offset, options);
 }
 
-pub pure fn replace_fn<T: PatternLike Copy>(pattern: T, subject: &str,
-                                            repl_fn: fn(Match) -> ~str,
-                                            options: int)
-                                            -> ReplaceResult {
+pub fn replace_fn<T: PatternLike Copy>(pattern: T, subject: &str,
+                                       repl_fn: fn(Match) -> ~str,
+                                       options: int)
+                                       -> ReplaceResult {
     return replace_fn_from(pattern, subject, repl_fn, 0u, options);
 }
 
-pub pure fn replace_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
+pub fn replace_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
                                             repl_fn: fn(Match) -> ~str,
                                             offset: uint,
                                             options: int)
@@ -412,35 +412,35 @@ pub pure fn replace_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
     }
 }
 
-pub pure fn replace_all<T: PatternLike Copy>(pattern: T, subject: &str,
-                                             repl: &str,
-                                             options: int)
-                                             -> ReplaceResult {
+pub fn replace_all<T: PatternLike Copy>(pattern: T, subject: &str,
+                                        repl: &str,
+                                        options: int)
+                                        -> ReplaceResult {
     return replace_all_fn_from(pattern, subject,
                                |_m| { str::from_slice(repl) }, 0u, options);
 }
 
-pub pure fn replace_all_fn<T: PatternLike Copy>(pattern: T, subject: &str,
-                                                repl_fn: fn(Match) -> ~str,
-                                                options: int)
-                                                -> ReplaceResult {
+pub fn replace_all_fn<T: PatternLike Copy>(pattern: T, subject: &str,
+                                           repl_fn: fn(Match) -> ~str,
+                                           options: int)
+                                           -> ReplaceResult {
     return replace_all_fn_from(pattern, subject, repl_fn, 0u, options);
 }
 
-pub pure fn replace_all_from<T: PatternLike Copy>(pattern: T, subject: &str,
-                                                  repl: &str,
-                                                  offset: uint,
-                                                  options: int)
-                                                  -> ReplaceResult {
+pub fn replace_all_from<T: PatternLike Copy>(pattern: T, subject: &str,
+                                             repl: &str,
+                                             offset: uint,
+                                             options: int)
+                                             -> ReplaceResult {
     return replace_all_fn_from(pattern, subject,
                                |_m| { str::from_slice(repl) }, offset, options);
 }
 
-pub pure fn replace_all_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
-                                                     repl_fn: fn(Match) -> ~str,
-                                                     offset: uint,
-                                                     options: int)
-                                                     -> ReplaceResult {
+pub fn replace_all_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
+                                                repl_fn: fn(Match) -> ~str,
+                                                offset: uint,
+                                                options: int)
+                                                -> ReplaceResult {
     let mut offset = offset;
     let subject_len = str::len(subject);
     assert offset <= subject_len;
@@ -468,13 +468,13 @@ pub pure fn replace_all_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
     return Ok(@s);
 }
 
-pub pure fn fmt_compile_err(e: CompileErr) -> ~str {
+pub fn fmt_compile_err(e: CompileErr) -> ~str {
     return fmt!("error %d: %s at offset %u", e.code, *e.reason, e.offset);
 }
 
 
 /// Return true iff `sr` indicates that the subject did not match the pattern
-pub pure fn is_nomatch(sr: SearchResult) -> bool {
+pub fn is_nomatch(sr: SearchResult) -> bool {
     match sr {
         Err(ExecErr(e)) if e == PCRE_ERROR_NOMATCH => true,
         _ => false,
