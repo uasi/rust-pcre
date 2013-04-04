@@ -6,21 +6,21 @@ use pcre::*;
 #[cfg(test)]
 mod test_util {
     pub trait OptionUtil<T> {
-        fn is_some_and(blk: &fn(T) -> bool) -> bool;
-        fn is_none_and(blk: &fn() -> bool) -> bool;
+        fn is_some_and(&self, blk: &fn(T) -> bool) -> bool;
+        fn is_none_and(&self, blk: &fn() -> bool) -> bool;
     }
 
     impl<T: Copy> OptionUtil<T> for Option<T> {
-        fn is_some_and(blk: &fn(T) -> bool) -> bool {
-            match self {
+        fn is_some_and(&self, blk: &fn(T) -> bool) -> bool {
+            match *self {
                 Some(t) => blk(t),
                 None => false,
             }
         }
 
         // Who wants?
-        fn is_none_and(blk: &fn() -> bool) -> bool {
-            match self {
+        fn is_none_and(&self, blk: &fn() -> bool) -> bool {
+            match *self {
                 Some(_) => false,
                 None => blk(),
             }
@@ -28,20 +28,20 @@ mod test_util {
     }
 
     pub trait ResultUtil<T, U> {
-        fn is_ok_and(blk: &fn(T) -> bool) -> bool;
-        fn is_err_and(blk: &fn(U) -> bool) -> bool;
+        fn is_ok_and(&self, blk: &fn(T) -> bool) -> bool;
+        fn is_err_and(&self, blk: &fn(U) -> bool) -> bool;
     }
 
     impl<T: Copy, U: Copy> ResultUtil<T, U> for Result<T, U> {
-        fn is_ok_and(blk: &fn(T) -> bool) -> bool {
-            match self {
+        fn is_ok_and(&self, blk: &fn(T) -> bool) -> bool {
+            match *self {
                 Ok(t) => blk(t),
                 Err(_) => false,
             }
         }
 
-        fn is_err_and(blk: &fn(U) -> bool) -> bool {
-            match self {
+        fn is_err_and(&self, blk: &fn(U) -> bool) -> bool {
+            match *self {
                 Ok(_) => false,
                 Err(u) => blk(u),
             }
