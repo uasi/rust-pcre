@@ -9,7 +9,8 @@ SYNOPSIS
 ```rust
 extern mod std;
 extern mod pcre;
-use pcre::*;
+use pcre::pcre::*;
+use pcre::consts::*;
 
 /// 1. Basic Usage
 fn basic_usage() {
