@@ -1,5 +1,4 @@
 extern mod std;
-
 use core::libc::{c_char, c_int, c_void};
 use core::option::{Some, None};
 use core::result::{Ok, Err};
@@ -13,7 +12,7 @@ struct PcreRes {
 }
 
 impl Drop for PcreRes {
-    fn finalize(&self) { unsafe { c::free(self.p as *c_void); } }
+    fn finalize(&self) { unsafe { libc::free(self.p as *c_void); } }
 }
 
 /// The result type of `compile`
@@ -56,12 +55,6 @@ pub struct Match {
     subject: @~str,
     pattern: Pattern,
     priv captures: @~[int],
-}
-
-#[nolink]
-#[abi = "cdecl"]
-extern mod c {
-    fn free(p: *c_void);
 }
 
 extern mod pcre {
