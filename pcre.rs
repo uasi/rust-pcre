@@ -93,7 +93,7 @@ impl PatternUtil for Pattern {
                                 PCRE_INFO_CAPTURECOUNT as c_int,
                                 ptr::addr_of(&count) as *c_void);
         }
-        assert count >= 0 as c_int;
+        assert!(count >= 0 as c_int);
         return count as uint;
     }
 
@@ -104,7 +104,7 @@ impl PatternUtil for Pattern {
                                 PCRE_INFO_NAMECOUNT as c_int,
                                 ptr::addr_of(&count) as *c_void);
         }
-        assert count >= 0 as c_int;
+        assert!(count >= 0 as c_int);
         return count as uint;
     }
 
@@ -115,7 +115,7 @@ impl PatternUtil for Pattern {
                                 PCRE_INFO_NAMEENTRYSIZE as c_int,
                                 ptr::addr_of(&size) as *c_void);
         }
-        assert size >= 0 as c_int;
+        assert!(size >= 0 as c_int);
         return size as uint;
     }
 
@@ -126,7 +126,7 @@ impl PatternUtil for Pattern {
                                 PCRE_INFO_NAMETABLE as c_int,
                                 ptr::addr_of(&table) as *c_void);
         }
-        assert table != ptr::null::<u8>();
+        assert!(table != ptr::null::<u8>());
         blk(table);
     }
 
@@ -336,7 +336,7 @@ pub fn exec(pattern: Pattern,
     for ovec.each |o| {
         unsafe { vec::push(&mut captures, *o as int); }
     }
-    assert vec::len(captures) % 2u == 0u;
+    assert!(vec::len(captures) % 2u == 0u);
 
     return Ok(Match {subject: @str::from_slice(subject),
                      pattern: pattern,
@@ -352,7 +352,7 @@ pub fn search<T: PatternLike>(pattern: T, subject: &str,
 pub fn search_from<T: PatternLike>(pattern: T, subject: &str,
                                    offset: uint, options: int)
                                    -> SearchResult {
-    assert offset <= str::len(subject);
+    assert!(offset <= str::len(subject));
 
     let c_opts = options & COMPILE_OPTIONS;
     let e_opts = options & EXEC_OPTIONS;
@@ -443,7 +443,7 @@ pub fn replace_all_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
                                                 -> ReplaceResult {
     let mut offset = offset;
     let subject_len = str::len(subject);
-    assert offset <= subject_len;
+    assert!(offset <= subject_len);
 
     let mut s = str::slice(subject, 0, offset);
     loop {
