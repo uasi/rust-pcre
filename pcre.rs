@@ -201,16 +201,16 @@ pub trait MatchExtensions {
 
 impl MatchExtensions for Match {
     fn matched(self) -> ~str {
-        return str::slice(*self.subject, self.begin(), self.end());
+        return str::slice(*self.subject, self.begin(), self.end()).to_owned();
     }
 
     fn prematch(self) -> ~str {
-        return str::slice(*self.subject, 0u, self.begin());
+        return str::slice(*self.subject, 0u, self.begin()).to_owned();
     }
 
     fn postmatch(self) -> ~str {
         return str::slice(*self.subject ,self.end(),
-                          str::char_len(*self.subject));
+                          str::char_len(*self.subject)).to_owned();
     }
 
     fn begin(self) -> uint {
@@ -230,7 +230,7 @@ impl MatchExtensions for Match {
         if(i1 < 0 || i2 < 0) {
             return None;
         }
-        return Some(@str::slice(*self.subject, i1 as uint, i2 as uint));
+        return Some(@str::slice(*self.subject, i1 as uint, i2 as uint).to_owned());
     }
 
     fn named_group(self, name: &str) -> Option<@~str> {
@@ -444,18 +444,18 @@ pub fn replace_all_fn_from<T: PatternLike + Copy>(pattern: T, subject: &str,
     let subject_len = str::len(subject);
     assert!(offset <= subject_len);
 
-    let mut s = str::slice(subject, 0, offset);
+    let mut s = str::slice(subject, 0, offset).to_owned();
     loop {
         let r = search_from(pattern, subject, offset, options);
         match r {
             Ok(m) => {
-                s += str::slice(subject, offset, m.begin());
+                s += str::slice(subject, offset, m.begin()).to_owned();
                 s += repl_fn(m);
                 offset = m.end();
             }
             Err(ExecErr(e)) if e == PCRE_ERROR_NOMATCH => {
                 if offset != subject_len {
-                    s += str::slice(subject, offset, subject_len);
+                    s += str::slice(subject, offset, subject_len).to_owned();
                 }
                 break;
             }
