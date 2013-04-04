@@ -10,9 +10,11 @@ enum Pcre {}
 enum PcreExtra {}
 struct PcreRes {
     p: *Pcre,
-    drop { unsafe { c::free(self.p as *c_void); } }
 }
 
+impl Drop for PcreRes {
+    fn finalize(&self) { unsafe { c::free(self.p as *c_void); } }
+}
 
 /// The result type of `compile`
 pub type CompileResult = Result<Pattern, CompileErr>;
