@@ -3,7 +3,6 @@ extern mod std;
 use core::libc::{c_char, c_int, c_void};
 use core::option::{Some, None};
 use core::result::{Ok, Err};
-use core::either::Either;
 use core::result::Result;
 use consts::*;
 
