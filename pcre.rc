@@ -3,7 +3,7 @@
        uuid = "f9c2a030-535f-11e1-b580-af2a4a8fafef",
        url  = "https://github.com/uasi/rust-pcre")];
 
-#[comment = "A PCRE binding for Rust"];
+#[comment = "PCRE bindings for Rust"];
 #[license = "MIT"];
 #[crate_type = "lib"];
 
