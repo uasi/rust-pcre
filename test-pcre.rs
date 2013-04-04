@@ -1,8 +1,6 @@
 extern mod std;
 extern mod pcre;
 
-use pcre::*;
-
 #[cfg(test)]
 mod test_util {
     pub trait OptionUtil<T> {
@@ -99,7 +97,8 @@ mod test_util {
 #[cfg(test)]
 mod tests {
     use test_util::*;
-    use pcre::*;
+    use pcre::pcre::*;
+    use pcre::consts::*;
 
     #[test]
     fn test_compile() {
@@ -239,7 +238,7 @@ mod tests {
 #[cfg(test)]
 mod test_match_extensions {
     use test_util::*;
-    use pcre::*;
+    use pcre::pcre::*;
 
     #[test]
     fn test_group() {
