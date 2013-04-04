@@ -9,5 +9,3 @@
 
 pub mod pcre;
 pub mod consts;
-
-pub use pcre::*;
