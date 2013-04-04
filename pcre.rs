@@ -376,33 +376,33 @@ pub fn search_from<T: PatternLike>(pattern: T, subject: &str,
     }
 }
 
-pub fn replace<T: PatternLike Copy>(pattern: T, subject: &str,
-                                    repl: &str, options: int)
-                                    -> ReplaceResult {
+pub fn replace<T: PatternLike + Copy>(pattern: T, subject: &str,
+                                      repl: &str, options: int)
+                                      -> ReplaceResult {
     return replace_fn_from(pattern, subject,
                            |_m| { str::from_slice(repl) }, 0u, options);
 }
 
-pub fn replace_from<T: PatternLike Copy>(pattern: T, subject: &str,
-                                         repl: &str,  offset: uint,
-                                         options: int)
-                                         -> ReplaceResult {
+pub fn replace_from<T: PatternLike + Copy>(pattern: T, subject: &str,
+                                           repl: &str,  offset: uint,
+                                           options: int)
+                                           -> ReplaceResult {
     return replace_fn_from(pattern, subject,
                            |_m| { str::from_slice(repl) }, offset, options);
 }
 
-pub fn replace_fn<T: PatternLike Copy>(pattern: T, subject: &str,
-                                       repl_fn: &fn(Match) -> ~str,
-                                       options: int)
-                                       -> ReplaceResult {
+pub fn replace_fn<T: PatternLike + Copy>(pattern: T, subject: &str,
+                                         repl_fn: &fn(Match) -> ~str,
+                                         options: int)
+                                         -> ReplaceResult {
     return replace_fn_from(pattern, subject, repl_fn, 0u, options);
 }
 
-pub fn replace_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
-                                            repl_fn: &fn(Match) -> ~str,
-                                            offset: uint,
-                                            options: int)
-                                            -> ReplaceResult {
+pub fn replace_fn_from<T: PatternLike + Copy>(pattern: T, subject: &str,
+                                              repl_fn: &fn(Match) -> ~str,
+                                              offset: uint,
+                                              options: int)
+                                              -> ReplaceResult {
     let r = search_from(pattern, subject, offset, options);
     match r {
         Ok(m) => {
@@ -412,35 +412,35 @@ pub fn replace_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
     }
 }
 
-pub fn replace_all<T: PatternLike Copy>(pattern: T, subject: &str,
-                                        repl: &str,
-                                        options: int)
-                                        -> ReplaceResult {
+pub fn replace_all<T: PatternLike + Copy>(pattern: T, subject: &str,
+                                          repl: &str,
+                                          options: int)
+                                          -> ReplaceResult {
     return replace_all_fn_from(pattern, subject,
                                |_m| { str::from_slice(repl) }, 0u, options);
 }
 
-pub fn replace_all_fn<T: PatternLike Copy>(pattern: T, subject: &str,
-                                           repl_fn: &fn(Match) -> ~str,
-                                           options: int)
-                                           -> ReplaceResult {
+pub fn replace_all_fn<T: PatternLike + Copy>(pattern: T, subject: &str,
+                                             repl_fn: &fn(Match) -> ~str,
+                                             options: int)
+                                             -> ReplaceResult {
     return replace_all_fn_from(pattern, subject, repl_fn, 0u, options);
 }
 
-pub fn replace_all_from<T: PatternLike Copy>(pattern: T, subject: &str,
-                                             repl: &str,
-                                             offset: uint,
-                                             options: int)
-                                             -> ReplaceResult {
+pub fn replace_all_from<T: PatternLike + Copy>(pattern: T, subject: &str,
+                                               repl: &str,
+                                               offset: uint,
+                                               options: int)
+                                               -> ReplaceResult {
     return replace_all_fn_from(pattern, subject,
                                |_m| { str::from_slice(repl) }, offset, options);
 }
 
-pub fn replace_all_fn_from<T: PatternLike Copy>(pattern: T, subject: &str,
-                                                repl_fn: &fn(Match) -> ~str,
-                                                offset: uint,
-                                                options: int)
-                                                -> ReplaceResult {
+pub fn replace_all_fn_from<T: PatternLike + Copy>(pattern: T, subject: &str,
+                                                  repl_fn: &fn(Match) -> ~str,
+                                                  offset: uint,
+                                                  options: int)
+                                                  -> ReplaceResult {
     let mut offset = offset;
     let subject_len = str::len(subject);
     assert!(offset <= subject_len);
