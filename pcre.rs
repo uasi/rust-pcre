@@ -85,7 +85,7 @@ pub trait PatternUtil {
     fn group_names(self) -> ~[~str];
 }
 
-impl Pattern: PatternUtil {
+impl PatternUtil for Pattern {
     fn info_capture_count(self) -> uint {
         let count = -1 as c_int;
         unsafe {
@@ -156,31 +156,31 @@ pub trait PatternLike {
     fn compile(&self, options: int) -> CompileResult;
 }
 
-impl &str: PatternLike {
+impl PatternLike for &str {
     fn compile(&self, options: int) -> CompileResult {
         compile(*self, options)
     }
 }
 
-impl ~str: PatternLike {
+impl PatternLike for ~str {
     fn compile(&self, options: int) -> CompileResult {
         compile(*self, options)
     }
 }
 
-impl @str: PatternLike {
+impl PatternLike for @str {
     fn compile(&self, options: int) -> CompileResult {
         compile(*self, options)
     }
 }
 
-impl Pattern: PatternLike {
+impl PatternLike for Pattern {
     fn compile(&self, _options: int) -> CompileResult {
         Ok(*self)
     }
 }
 
-impl CompileResult: PatternLike {
+impl PatternLike for CompileResult {
     fn compile(&self, _options: int) -> CompileResult {
         *self
     }
@@ -200,7 +200,7 @@ pub trait MatchExtensions {
     fn group_names(self) -> ~[~str];
 }
 
-impl Match: MatchExtensions {
+impl MatchExtensions for Match {
     fn matched(self) -> ~str {
         return str::slice(*self.subject, self.begin(), self.end());
     }

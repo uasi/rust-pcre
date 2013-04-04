@@ -10,7 +10,7 @@ mod test_util {
         fn is_none_and(blk: &fn() -> bool) -> bool;
     }
 
-    impl<T: Copy> Option<T>: OptionUtil<T> {
+    impl<T: Copy> OptionUtil<T> for Option<T> {
         fn is_some_and(blk: &fn(T) -> bool) -> bool {
             match self {
                 Some(t) => blk(t),
@@ -32,7 +32,7 @@ mod test_util {
         fn is_err_and(blk: &fn(U) -> bool) -> bool;
     }
 
-    impl<T: Copy, U: Copy> Result<T, U>: ResultUtil<T, U> {
+    impl<T: Copy, U: Copy> ResultUtil<T, U> for Result<T, U> {
         fn is_ok_and(blk: &fn(T) -> bool) -> bool {
             match self {
                 Ok(t) => blk(t),
