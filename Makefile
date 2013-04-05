@@ -7,9 +7,9 @@ all: build
 build: $(SOURCE)
 	$(RUSTC) $(RUSTC_OPTS) --lib pcre.rc
 
-test: clean build
-	$(RUSTC) $(RUSTC_OPTS) -L . --test pcre.rc
-	./pcre
+test: clean
+	$(RUSTC) $(RUSTC_OPTS) -L . --test pcre.rc -o pcretest~
+	./pcretest~
 
 clean:
-	rm -rf pcre *.dSYM *.dylib *.so *~
+	rm -rf pcre pcretest~ *.dSYM *.dylib *.so
