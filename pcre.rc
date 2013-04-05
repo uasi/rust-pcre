@@ -9,3 +9,6 @@
 
 pub mod pcre;
 pub mod consts;
+
+#[cfg(test)]
+mod tests;

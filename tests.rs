@@ -1,5 +1,4 @@
 extern mod std;
-extern mod pcre;
 
 #[cfg(test)]
 mod test_util {
@@ -96,9 +95,9 @@ mod test_util {
 
 #[cfg(test)]
 mod tests {
-    use test_util::*;
-    use pcre::pcre::*;
-    use pcre::consts::*;
+    use super::test_util::*;
+    use pcre::*;
+    use consts::*;
 
     #[test]
     fn test_compile() {
@@ -236,9 +235,9 @@ mod tests {
 }
 
 #[cfg(test)]
-mod test_match_extensions {
-    use test_util::*;
-    use pcre::pcre::*;
+mod match_extension_tests {
+    use super::test_util::*;
+    use pcre::*;
 
     #[test]
     fn test_group() {

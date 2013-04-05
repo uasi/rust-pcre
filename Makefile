@@ -8,8 +8,8 @@ build: $(SOURCE)
 	$(RUSTC) $(RUSTC_OPTS) --lib pcre.rc
 
 test: clean build
-	$(RUSTC) $(RUSTC_OPTS) -L . --test test-pcre.rs
-	./test-pcre
+	$(RUSTC) $(RUSTC_OPTS) -L . --test pcre.rc
+	./pcre
 
 clean:
-	rm -rf test-pcre *.dSYM *.dylib *.so
+	rm -rf pcre *.dSYM *.dylib *.so *~
