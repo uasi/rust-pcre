@@ -255,6 +255,33 @@ mod tests {
         let pat2 = compile("foobar", PCRE_CASELESS).get();
         assert!(pat1 != pat2);
     }
+
+    #[test]
+    fn test_match_equality() {
+        let m1 = search("foo...", "foobar", 0).get();
+        let m2 = search("foo...", "foobar", 0).get();
+        assert!(m1 == m2);
+
+        let m1 = search(~"foo...", "foobar", 0).get();
+        let m2 = search(@"foo...", "foobar", 0).get();
+        assert!(m1 == m2);
+
+        let m1 = search("foo...", "foobar", 0).get();
+        let m2 = search("......", "foobar", 0).get();
+        assert!(m1 != m2);
+
+        let m1 = search("(foo)...", "foobar", 0).get();
+        let m2 = search("foo(...)", "foobar", 0).get();
+        assert!(m1 != m2);
+
+        let m1 = search("foo...", "foobar", 0).get();
+        let m2 = search("foo...", "foobar", PCRE_CASELESS).get();
+        assert!(m1 != m2);
+
+        let m1 = search("(?i)foo...", "foobar", 0).get();
+        let m2 = search("foo...", "foobar", PCRE_CASELESS).get();
+        assert!(m1 != m2);
+    }
 }
 
 #[cfg(test)]

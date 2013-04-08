@@ -68,6 +68,16 @@ pub struct Match {
     priv captures: @~[int],
 }
 
+impl Eq for Match {
+    fn eq(&self, other: &Match) -> bool {
+        self.subject == other.subject && self.pattern == other.pattern
+    }
+
+    fn ne(&self, other: &Match) -> bool {
+        !self.eq(other)
+    }
+}
+
 extern mod pcre {
     fn pcre_compile2(pattern: *c_char, options: c_int,
                      errorcodeptr: *c_int,
