@@ -257,6 +257,29 @@ mod tests {
     }
 
     #[test]
+    fn test_compile_err_equality() {
+        let cerr1 = compile("foobar(", 0).get_err();
+        let cerr2 = compile("foobar(", 0).get_err();
+        assert!(cerr1 == cerr2);
+
+        let cerr1 = compile(~"foobar(", 0).get_err();
+        let cerr2 = compile(@"foobar(", 0).get_err();
+        assert!(cerr1 == cerr2);
+
+        let cerr1 = compile("foobar(", 0).get_err();
+        let cerr2 = compile("foo...", 0).get_err();
+        assert!(cerr1 != cerr2);
+
+        let cerr1 = compile("foobar(", 0).get_err();
+        let cerr2 = compile("foobar(", PCRE_CASELESS).get_err();
+        assert!(cerr1 != cerr2);
+
+        let cerr1 = compile("foobar(", 0).get_err();
+        let cerr2 = compile("foobar(", PCRE_CASELESS).get_err();
+        assert!(cerr1 != cerr2);
+    }
+
+    #[test]
     fn test_match_equality() {
         let m1 = search("foo...", "foobar", 0).get();
         let m2 = search("foo...", "foobar", 0).get();

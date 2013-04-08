@@ -21,7 +21,6 @@ pub type CompileResult = Result<Pattern, CompileErr>;
 /// The result type of `exec`
 pub type ExecResult = Result<Match, ExecErr>;
 
-
 /// The result type of `search`
 pub type SearchResult = Result<Match, RegexErr>;
 
@@ -29,6 +28,7 @@ pub type SearchResult = Result<Match, RegexErr>;
 pub type ReplaceResult = Result<@~str, RegexErr>;
 
 /// The type that represents compile error
+#[deriving(Eq)]
 pub struct CompileErr {
     code: int,
     reason: @~str,
