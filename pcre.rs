@@ -47,6 +47,7 @@ pub enum RegexErr {
 /// Compiled regular expression
 pub struct Pattern {
     str: @~str,
+    options: int,
     priv pcre_res: @PcreRes,
 }
 
@@ -294,6 +295,7 @@ pub fn compile(pattern: &str, options: int) -> CompileResult {
                                offset: erroffset as uint});
     }
     return Ok(Pattern {str: @str::from_slice(pattern),
+                       options: options,
                        pcre_res: @PcreRes {p: p}});
 }
 
