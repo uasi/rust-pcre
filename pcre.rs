@@ -39,6 +39,7 @@ pub struct CompileErr {
 pub type ExecErr = int;
 
 /// Either compile or exec error
+#[deriving(Eq)]
 pub enum RegexErr {
     CompileErr(CompileErr),
     ExecErr(ExecErr),
