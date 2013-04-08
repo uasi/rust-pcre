@@ -232,6 +232,29 @@ mod tests {
                                     |m| { str::to_upper(m.matched()) }, 2u, 0);
         assert!(r.is_ok_and(|s| s == @~"AbcdBCDBCDE"));
     }
+
+    #[test]
+    fn test_pattern_equality() {
+        let pat1 = compile("foobar", 0).get();
+        let pat2 = compile("foobar", 0).get();
+        assert!(pat1 == pat2);
+
+        let pat1 = compile(~"foobar", 0).get();
+        let pat2 = compile(@"foobar", 0).get();
+        assert!(pat1 == pat2);
+
+        let pat1 = compile("foobar", 0).get();
+        let pat2 = compile("foo...", 0).get();
+        assert!(pat1 != pat2);
+
+        let pat1 = compile("foobar", 0).get();
+        let pat2 = compile("foobar", PCRE_CASELESS).get();
+        assert!(pat1 != pat2);
+
+        let pat1 = compile("(?i)foobar", 0).get();
+        let pat2 = compile("foobar", PCRE_CASELESS).get();
+        assert!(pat1 != pat2);
+    }
 }
 
 #[cfg(test)]

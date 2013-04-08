@@ -51,6 +51,16 @@ pub struct Pattern {
     priv pcre_res: @PcreRes,
 }
 
+impl Eq for Pattern {
+    fn eq(&self, other: &Pattern) -> bool {
+        self.str == other.str && self.options == other.options
+     }
+
+     fn ne(&self, other: &Pattern) -> bool {
+        !self.eq(other)
+     }
+}
+
 /// Match
 pub struct Match {
     subject: @~str,
