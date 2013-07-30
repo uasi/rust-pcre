@@ -40,7 +40,7 @@ fn basic_usage() {
 
 /// 2. Patterns and Pattern-Like Values
 fn patterns() {
-    // CompoleResult, Pattern, &str, ~str, and @str types are all
+    // CompoleResult, Pattern, &str, ~str, and @str types
     // implement PatternLike trait.
     // So each of these values can be passed to search() etc. as a pattern.
     let comp_result: CompileResult = compile("pat.*", PCRE_CASELESS);
