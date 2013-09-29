@@ -1,18 +1,40 @@
 extern mod std;
-use core::libc::{c_char, c_int, c_void};
-use core::option::{Some, None};
-use core::result::{Ok, Err};
-use core::result::Result;
+use std::ptr;
+use std::vec;
+use std::c_str::*;
+use std::libc::{c_char, c_int, c_void};
+use std::option::{Some, None};
+use std::result::{Ok, Err};
+use std::result::Result;
+use std::libc::funcs::c95::stdlib::free;
 use consts::*;
 
-enum Pcre {}
-enum PcreExtra {}
+mod pcre {
+    use std::libc::{c_char, c_int, c_void};
+    pub enum Pcre {}
+    pub enum PcreExtra {}
+
+    extern {
+        fn pcre_compile2(pattern: *c_char, options: c_int,
+                         errorcodeptr: *c_int,
+                         errptr: **c_char, erroffset: *c_int,
+                         tableptr: *c_char) -> *Pcre;
+        fn pcre_exec(code: *Pcre, extra: *PcreExtra,
+                     subject: *c_char, length: c_int, startoffset: c_int,
+                     options: c_int, ovector: * c_int, ovecsize: c_int) -> c_int;
+        fn pcre_fullinfo(code: *Pcre, extra: *PcreExtra,
+                         what: c_int, where: *c_void) -> c_int;
+        fn pcre_get_stringnumber(code: *Pcre, name: *c_char) -> c_int;
+    }
+}
+
 struct PcreRes {
-    p: *Pcre,
+    p: *pcre::Pcre,
 }
 
 impl Drop for PcreRes {
-    fn finalize(&self) { unsafe { libc::free(self.p as *c_void); } }
+    #[fixed_stack_segment]
+    fn drop(&mut self) { unsafe { free(self.p as *c_void); } }
 }
 
 /// The result type of `compile`
@@ -28,10 +50,10 @@ pub type SearchResult = Result<Match, RegexErr>;
 pub type ReplaceResult = Result<@~str, RegexErr>;
 
 /// The type that represents compile error
-#[deriving(Eq)]
+#[deriving(Eq,Clone,ToStr)]
 pub struct CompileErr {
     code: int,
-    reason: @~str,
+    reason: ~str,
     offset: uint,
 }
 
@@ -39,13 +61,14 @@ pub struct CompileErr {
 pub type ExecErr = int;
 
 /// Either compile or exec error
-#[deriving(Eq)]
+#[deriving(Eq,Clone,ToStr)]
 pub enum RegexErr {
     CompileErr(CompileErr),
     ExecErr(ExecErr),
 }
 
 /// Compiled regular expression
+#[deriving(Clone)]
 pub struct Pattern {
     str: @~str,
     options: int,
@@ -79,18 +102,6 @@ impl Eq for Match {
     }
 }
 
-extern mod pcre {
-    fn pcre_compile2(pattern: *c_char, options: c_int,
-                     errorcodeptr: *c_int,
-                     errptr: **c_char, erroffset: *c_int,
-                     tableptr: *c_char) -> *Pcre;
-    fn pcre_exec(code: *Pcre, extra: *PcreExtra,
-                 subject: *c_char, length: c_int, startoffset: c_int,
-                 options: c_int, ovector: * c_int, ovecsize: c_int) -> c_int;
-    fn pcre_fullinfo(code: *Pcre, extra: *PcreExtra,
-                     what: c_int, where: *c_void) -> c_int;
-    fn pcre_get_stringnumber(code: *Pcre, name: *c_char) -> c_int;
-}
 
 pub trait PatternUtil {
     fn info_capture_count(self) -> uint;
@@ -102,45 +113,49 @@ pub trait PatternUtil {
 }
 
 impl PatternUtil for Pattern {
+    #[fixed_stack_segment]
     fn info_capture_count(self) -> uint {
         let count = -1 as c_int;
         unsafe {
             pcre::pcre_fullinfo(self.pcre_res.p, ptr::null(),
                                 PCRE_INFO_CAPTURECOUNT as c_int,
-                                ptr::addr_of(&count) as *c_void);
+                                ptr::to_unsafe_ptr(&count) as *c_void);
         }
         assert!(count >= 0 as c_int);
         return count as uint;
     }
 
+    #[fixed_stack_segment]
     fn info_name_count(self) -> uint {
         let count = -1 as c_int;
         unsafe {
             pcre::pcre_fullinfo(self.pcre_res.p, ptr::null(),
                                 PCRE_INFO_NAMECOUNT as c_int,
-                                ptr::addr_of(&count) as *c_void);
+                                ptr::to_unsafe_ptr(&count) as *c_void);
         }
         assert!(count >= 0 as c_int);
         return count as uint;
     }
 
+    #[fixed_stack_segment]
     fn info_name_entry_size(self) -> uint {
         let size = -1 as c_int;
         unsafe {
             pcre::pcre_fullinfo(self.pcre_res.p, ptr::null(),
                                 PCRE_INFO_NAMEENTRYSIZE as c_int,
-                                ptr::addr_of(&size) as *c_void);
+                                ptr::to_unsafe_ptr(&size) as *c_void);
         }
         assert!(size >= 0 as c_int);
         return size as uint;
     }
 
+    #[fixed_stack_segment]
     fn with_name_table(self, blk: &fn(*u8)) {
         let table = ptr::null::<u8>();
         unsafe {
             pcre::pcre_fullinfo(self.pcre_res.p, ptr::null(),
                                 PCRE_INFO_NAMETABLE as c_int,
-                                ptr::addr_of(&table) as *c_void);
+                                ptr::to_unsafe_ptr(&table) as *c_void);
         }
         assert!(table != ptr::null::<u8>());
         blk(table);
@@ -157,10 +172,13 @@ impl PatternUtil for Pattern {
         let mut names: ~[~str] = ~[];
         unsafe {
             do self.with_name_table |table| {
-                for uint::range(0u, count) |i| {
-                    let p = ptr::offset(table, size * i + 2u);
-                    let s = str::raw::from_c_str(p as *c_char);
-                    vec::push(&mut names, s);
+                for i in range(0u, count) {
+                    let p = ptr::offset(table, (size * i + 2u) as int);
+                    let c_string = CString::new(p as *c_char, false);
+                    match c_string.as_str() {
+                      Some(string) => { names.push(string.to_owned()) },
+                      None => { fail!("Name in nametable was null!") }
+                    }
                 }
             }
         }
@@ -198,7 +216,7 @@ impl PatternLike for Pattern {
 
 impl PatternLike for CompileResult {
     fn compile(&self, _options: int) -> CompileResult {
-        *self
+        self.clone()
     }
 }
 
@@ -218,16 +236,16 @@ pub trait MatchExtensions {
 
 impl MatchExtensions for Match {
     fn matched(self) -> ~str {
-        return str::slice(*self.subject, self.begin(), self.end()).to_owned();
+        return self.subject.slice(self.begin(), self.end()).to_owned();
     }
 
     fn prematch(self) -> ~str {
-        return str::slice(*self.subject, 0u, self.begin()).to_owned();
+        return self.subject.slice(0u, self.begin()).to_owned();
     }
 
     fn postmatch(self) -> ~str {
-        return str::slice(*self.subject ,self.end(),
-                          str::char_len(*self.subject)).to_owned();
+        return self.subject.slice(self.end(),
+                                    (*self.subject).len()).to_owned();
     }
 
     fn begin(self) -> uint {
@@ -247,33 +265,30 @@ impl MatchExtensions for Match {
         if(i1 < 0 || i2 < 0) {
             return None;
         }
-        return Some(@str::slice(*self.subject, i1 as uint, i2 as uint).to_owned());
+        return Some(@(self.subject.slice(i1 as uint, i2 as uint).to_owned()));
     }
 
+    #[fixed_stack_segment]
     fn named_group(self, name: &str) -> Option<@~str> {
         let i =  unsafe {
-            str::as_buf(name, |s, _n| {
-                pcre::pcre_get_stringnumber(self.pattern.pcre_res.p,
-                                            s as *c_char)
-            })
+            do name.with_c_str |s| {
+                pcre::pcre_get_stringnumber(self.pattern.pcre_res.p, s)
+            }
         };
         if i <= 0 as c_int { return None; }
         return self.group(i as uint);
     }
 
     fn subgroups(self) -> ~[~str] {
-        let mut v = ~[];
-        unsafe {
-            vec::reserve(&mut v, self.group_count());
-            do self.subgroups_iter |subgroup| {
-                vec::push(&mut v, str::from_slice(subgroup));
-            }
+        let mut v = vec::with_capacity(self.group_count());
+        do self.subgroups_iter |subgroup| {
+            v.push(subgroup.to_owned());
         }
         return v;
     }
 
     fn subgroups_iter(self, blk: &fn(&str)) {
-        for uint::range(1u, self.group_count() + 1u) |i| {
+        for i in range(1u, self.group_count() + 1u) {
             match self.group(i) {
               Some(s) => blk(*s),
               None => fail!(),
@@ -282,7 +297,7 @@ impl MatchExtensions for Match {
     }
 
     fn group_count(self) -> uint {
-        return vec::len(*self.captures) / 2u - 1u;
+        return (*self.captures).len() / 2u - 1u;
     }
 
     fn group_names(self) -> ~[~str] {
@@ -290,6 +305,7 @@ impl MatchExtensions for Match {
     }
 }
 
+#[fixed_stack_segment]
 pub fn compile(pattern: &str, options: int) -> CompileResult {
     if options | COMPILE_OPTIONS != COMPILE_OPTIONS {
         warn!("unrecognized option bit(s) are set");
@@ -300,26 +316,33 @@ pub fn compile(pattern: &str, options: int) -> CompileResult {
     let errreason: *c_char = ptr::null();
     let erroffset = 0 as c_int;
     let p = unsafe {
-        str::as_buf(pattern, |pat, _n| {
+        do pattern.with_c_str |pat| {
             pcre::pcre_compile2(pat as *c_char,
                                 options as c_int,
-                                ptr::addr_of(&errcode),
-                                ptr::addr_of(&errreason),
-                                ptr::addr_of(&erroffset),
+                                ptr::to_unsafe_ptr(&errcode),
+                                ptr::to_unsafe_ptr(&errreason),
+                                ptr::to_unsafe_ptr(&erroffset),
                                 ptr::null())
-        })
+        }
     };
     if p == ptr::null() {
-        let reason = unsafe { @str::raw::from_c_str(errreason) };
-        return Err(CompileErr {code: errcode as int,
-                               reason: reason,
-                               offset: erroffset as uint});
+        let reason = unsafe { CString::new(errreason, false) };
+        match reason.as_str() {
+            Some(string) => {
+                return Err(CompileErr {code: errcode as int,
+                                       reason: string.to_owned(),
+                                       offset: erroffset as uint});
+            },
+            None => { fail!("errreason was NULL!")}
+        }
+
     }
-    return Ok(Pattern {str: @str::from_slice(pattern),
+    return Ok(Pattern {str: @pattern.to_owned(),
                        options: options,
                        pcre_res: @PcreRes {p: p}});
 }
 
+#[fixed_stack_segment]
 pub fn exec(pattern: Pattern,
             subject: &str, offset: uint,
             options: int) -> ExecResult {
@@ -334,13 +357,13 @@ pub fn exec(pattern: Pattern,
     let mut ovec = vec::from_elem((count as uint) * 3u, 0u as c_int);
 
     let ret_code = unsafe {
-        str::as_buf(subject, |s, _n| {
+        do subject.with_c_str |s| {
             pcre::pcre_exec(pattern.pcre_res.p, ptr::null(),
-                            s as *c_char, str::len(subject) as c_int,
+                            s as *c_char, subject.len() as c_int,
                             offset as c_int, options as c_int,
                             vec::raw::to_ptr(ovec) as *c_int,
                             count * (3 as c_int)) as int
-        })
+        }
     };
 
     if ret_code < 0 { return Err(ret_code as ExecErr); }
@@ -348,14 +371,14 @@ pub fn exec(pattern: Pattern,
     // Truncate the working space.
     unsafe { vec::raw::set_len(&mut ovec, count as uint * 2u) }
 
-    let mut captures: ~[int] = ~[];
-    unsafe { vec::reserve(&mut captures, vec::len(ovec)); }
-    for ovec.each |o| {
-        unsafe { vec::push(&mut captures, *o as int); }
-    }
-    assert!(vec::len(captures) % 2u == 0u);
+    let mut captures: ~[int] = vec::with_capacity(ovec.len());
 
-    return Ok(Match {subject: @str::from_slice(subject),
+    for o in ovec.iter() {
+        captures.push(*o as int);
+    }
+    assert!(captures.len() % 2u == 0u);
+
+    return Ok(Match {subject: @subject.to_owned(),
                      pattern: pattern,
                      captures: @captures});
 }
@@ -369,7 +392,7 @@ pub fn search<T: PatternLike>(pattern: T, subject: &str,
 pub fn search_from<T: PatternLike>(pattern: T, subject: &str,
                                    offset: uint, options: int)
                                    -> SearchResult {
-    assert!(offset <= str::len(subject));
+    assert!(offset <= subject.len());
 
     let c_opts = options & COMPILE_OPTIONS;
     let e_opts = options & EXEC_OPTIONS;
@@ -393,29 +416,29 @@ pub fn search_from<T: PatternLike>(pattern: T, subject: &str,
     }
 }
 
-pub fn replace<T: PatternLike + Copy>(pattern: T, subject: &str,
+pub fn replace<T: PatternLike + Clone>(pattern: T, subject: &str,
                                       repl: &str, options: int)
                                       -> ReplaceResult {
     return replace_fn_from(pattern, subject,
-                           |_m| { str::from_slice(repl) }, 0u, options);
+                           |_m| { repl.to_owned() }, 0u, options);
 }
 
-pub fn replace_from<T: PatternLike + Copy>(pattern: T, subject: &str,
+pub fn replace_from<T: PatternLike + Clone>(pattern: T, subject: &str,
                                            repl: &str,  offset: uint,
                                            options: int)
                                            -> ReplaceResult {
     return replace_fn_from(pattern, subject,
-                           |_m| { str::from_slice(repl) }, offset, options);
+                           |_m| { repl.to_owned() }, offset, options);
 }
 
-pub fn replace_fn<T: PatternLike + Copy>(pattern: T, subject: &str,
+pub fn replace_fn<T: PatternLike + Clone>(pattern: T, subject: &str,
                                          repl_fn: &fn(Match) -> ~str,
                                          options: int)
                                          -> ReplaceResult {
     return replace_fn_from(pattern, subject, repl_fn, 0u, options);
 }
 
-pub fn replace_fn_from<T: PatternLike + Copy>(pattern: T, subject: &str,
+pub fn replace_fn_from<T: PatternLike + Clone>(pattern: T, subject: &str,
                                               repl_fn: &fn(Match) -> ~str,
                                               offset: uint,
                                               options: int)
@@ -429,64 +452,65 @@ pub fn replace_fn_from<T: PatternLike + Copy>(pattern: T, subject: &str,
     }
 }
 
-pub fn replace_all<T: PatternLike + Copy>(pattern: T, subject: &str,
+pub fn replace_all<T: PatternLike + Clone>(pattern: T, subject: &str,
                                           repl: &str,
                                           options: int)
                                           -> ReplaceResult {
     return replace_all_fn_from(pattern, subject,
-                               |_m| { str::from_slice(repl) }, 0u, options);
+                               |_m| { repl.to_owned() }, 0u, options);
 }
 
-pub fn replace_all_fn<T: PatternLike + Copy>(pattern: T, subject: &str,
+pub fn replace_all_fn<T: PatternLike + Clone>(pattern: T, subject: &str,
                                              repl_fn: &fn(Match) -> ~str,
                                              options: int)
                                              -> ReplaceResult {
     return replace_all_fn_from(pattern, subject, repl_fn, 0u, options);
 }
 
-pub fn replace_all_from<T: PatternLike + Copy>(pattern: T, subject: &str,
+pub fn replace_all_from<T: PatternLike + Clone>(pattern: T, subject: &str,
                                                repl: &str,
                                                offset: uint,
                                                options: int)
                                                -> ReplaceResult {
     return replace_all_fn_from(pattern, subject,
-                               |_m| { str::from_slice(repl) }, offset, options);
+                               |_m| { repl.to_owned() }, offset, options);
 }
 
-pub fn replace_all_fn_from<T: PatternLike + Copy>(pattern: T, subject: &str,
+pub fn replace_all_fn_from<T: PatternLike + Clone>(pattern: T, subject: &str,
                                                   repl_fn: &fn(Match) -> ~str,
                                                   offset: uint,
                                                   options: int)
                                                   -> ReplaceResult {
     let mut offset = offset;
-    let subject_len = str::len(subject);
+    let subject_len = subject.len();
     assert!(offset <= subject_len);
 
-    let mut s = str::slice(subject, 0, offset).to_owned();
+    let mut strings = ~[];
+    strings.push(subject.slice(0, offset).to_owned());
     loop {
-        let r = search_from(pattern, subject, offset, options);
+        let r = search_from(pattern.clone(), subject, offset, options);
         match r {
             Ok(m) => {
-                s += str::slice(subject, offset, m.begin()).to_owned();
-                s += repl_fn(m);
+                strings.push(subject.slice(offset, m.begin()).to_owned());
+                strings.push(repl_fn(m));
                 offset = m.end();
             }
             Err(ExecErr(e)) if e == PCRE_ERROR_NOMATCH => {
                 if offset != subject_len {
-                    s += str::slice(subject, offset, subject_len).to_owned();
+                    strings.push(subject.slice(offset, subject_len).to_owned());
                 }
                 break;
             }
             Err(e) => {
-                return Err(copy e);
+                return Err(e);
             }
         }
     }
-    return Ok(@s);
+    return Ok(@strings.concat());
 }
 
 pub fn fmt_compile_err(e: CompileErr) -> ~str {
-    return fmt!("error %d: %s at offset %u", e.code, *e.reason, e.offset);
+    return fmt!("error %d: %s at offset %u", e.code, e.reason, e.offset);
 }
 
 
