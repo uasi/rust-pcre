@@ -1,5 +1,5 @@
 RUSTC := rustc
-RUSTC_OPTS :=
+RUSTC_OPTS := --link-args="-lpcre"
 SOURCE := pcre.rc pcre.rs consts.rs
 
 all: build
