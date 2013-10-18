@@ -3,6 +3,8 @@ rust-pcre
 
 PCRE bindings for Rust.
 
+[![Build Status](https://travis-ci.org/uasi/rust-pcre.png?branch=master)](https://travis-ci.org/uasi/rust-pcre) (with rust-nightly)
+
 SYNOPSIS
 --------
 
