@@ -1,13 +1,16 @@
 extern mod std;
 use std::ptr;
 use std::vec;
-use std::c_str::*;
+use std::c_str::{CString};
 use std::libc::{c_char, c_int, c_void};
 use std::option::{Some, None};
 use std::result::{Ok, Err};
 use std::result::Result;
 use std::libc::funcs::c95::stdlib::free;
-use consts::*;
+use consts::{PCRE_INFO_CAPTURECOUNT, PCRE_INFO_NAMECOUNT, 
+            PCRE_INFO_NAMEENTRYSIZE, PCRE_INFO_NAMETABLE,
+            PCRE_NO_UTF8_CHECK, PCRE_ERROR_NOMATCH,
+            COMPILE_OPTIONS, EXEC_OPTIONS};
 
 mod pcre {
     use std::libc::{c_char, c_int, c_void};
@@ -15,16 +18,16 @@ mod pcre {
     pub enum PcreExtra {}
 
     extern {
-        fn pcre_compile2(pattern: *c_char, options: c_int,
+        pub fn pcre_compile2(pattern: *c_char, options: c_int,
                          errorcodeptr: *c_int,
                          errptr: **c_char, erroffset: *c_int,
                          tableptr: *c_char) -> *Pcre;
-        fn pcre_exec(code: *Pcre, extra: *PcreExtra,
+        pub fn pcre_exec(code: *Pcre, extra: *PcreExtra,
                      subject: *c_char, length: c_int, startoffset: c_int,
                      options: c_int, ovector: * c_int, ovecsize: c_int) -> c_int;
-        fn pcre_fullinfo(code: *Pcre, extra: *PcreExtra,
+        pub fn pcre_fullinfo(code: *Pcre, extra: *PcreExtra,
                          what: c_int, where: *c_void) -> c_int;
-        fn pcre_get_stringnumber(code: *Pcre, name: *c_char) -> c_int;
+        pub fn pcre_get_stringnumber(code: *Pcre, name: *c_char) -> c_int;
     }
 }
 

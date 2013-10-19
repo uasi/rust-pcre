@@ -1,6 +1,6 @@
 extern mod std;
 
-use std::ascii::*;
+use std::ascii::OwnedStrAsciiExt;
 
 #[cfg(test)]
 mod test_util {
@@ -97,9 +97,11 @@ mod test_util {
 
 #[cfg(test)]
 mod tests {
-    use super::test_util::*;
-    use pcre::*;
-    use consts::*;
+    //use super::test_util::{is_nomatch};
+    use super::test_util::{ResultUtil, OptionUtil};
+    use pcre::{compile, search, CompileErr, is_nomatch, MatchExtensions};
+    use pcre::{replace, replace_from, replace_all, replace_fn, replace_all_from, replace_all_fn, replace_fn_from, replace_all_fn_from};
+    use consts::{PCRE_CASELESS};
 
     #[test]
     fn test_compile() {
@@ -308,8 +310,9 @@ mod tests {
 
 #[cfg(test)]
 mod match_extension_tests {
-    use super::test_util::*;
-    use pcre::*;
+    //use super::test_util::*;
+    use super::test_util::{ResultUtil, OptionUtil};
+    use pcre::{search, MatchExtensions};
 
     #[test]
     fn test_group() {
