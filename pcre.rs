@@ -513,7 +513,7 @@ pub fn replace_all_fn_from<T: PatternLike + Clone>(pattern: T, subject: &str,
 }
 
 pub fn fmt_compile_err(e: CompileErr) -> ~str {
-    return fmt!("error %d: %s at offset %u", e.code, e.reason, e.offset);
+    return format!("error {:d}: {:s} at offset {:u}", e.code, e.reason, e.offset);
 }
 
 
